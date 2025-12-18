@@ -14,10 +14,10 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v10';
+const STORAGE_KEY = 'jingxin_guardian_data_v11';
 
 const SYSTEM_FACTORY_CONFIG: SystemConfig = {
-  openRouterKey: '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', // 留空，强制由管理员在 UI 中配置
+  openRouterKey: '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', 
   preferredModel: 'google/gemini-3-flash-preview',
   apiBaseUrl: 'https://openrouter.ai/api/v1'
 };

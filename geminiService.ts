@@ -8,11 +8,11 @@ export const geminiService = {
    * 严格遵循 OpenRouter 浏览器端调用规范
    */
   async callAI(prompt: string, config: SystemConfig, systemInstruction?: string) {
-    // 1. 获取并极端净化 Key
+    // 1. 获取并净化 Key
     const key = (config.openRouterKey || "").trim();
     
-    if (!key || key.startsWith("sk-or-v1-d0d8")) { // 过滤掉已知失效的占位符
-      return "[系统提示] 当前使用的 API Key 可能已失效或未配置。请点击左侧导航栏底部的“系统设置”更新您的 OpenRouter Key。";
+    if (!key) {
+      return "[系统报警] 未配置 API Key。请点击左侧导航栏底部的“系统设置”配置您的 OpenRouter Key。";
     }
 
     try {
@@ -20,7 +20,7 @@ export const geminiService = {
         .trim()
         .replace(/\/$/, "");
 
-      // OpenRouter 在浏览器环境极其看重这两个 Header
+      // OpenRouter 在浏览器环境要求的 Header
       const referer = window.location.origin || "https://jingxin-guardian.vercel.app";
       const title = "警心卫士分析系统";
 
@@ -33,7 +33,7 @@ export const geminiService = {
           "X-Title": title
         },
         body: JSON.stringify({
-          model: config.preferredModel || "google/gemini-2.0-flash-001",
+          model: config.preferredModel || "google/gemini-3-flash-preview",
           messages: [
             ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
             { role: "user", content: prompt }
@@ -53,18 +53,18 @@ export const geminiService = {
         
         // 针对性错误引导
         if (errorDetail.includes("User not found") || errorDetail.includes("invalid_api_key")) {
-          return `[鉴权失败] OpenRouter 无法识别此 Key。请检查：\n1. Key 是否被删除或禁用\n2. 是否有余额\n3. 在“系统设置”中重新粘贴 Key 并保存。`;
+          return `[鉴权失败] OpenRouter 无法识别此 Key。请检查该 Key 是否已在官网被删除，或是否有余额。 (原始错误: ${errorDetail})`;
         }
         
         if (errorDetail.includes("Insufficient balance") || errorDetail.includes("credits")) {
-          return `[余额不足] 您的 OpenRouter 账户已欠费。请前往 openrouter.ai 充值。`;
+          return `[余额不足] 您的 OpenRouter 账户已欠费，请及时充值。`;
         }
 
         return `[接口返回报错] ${errorDetail}`;
       }
     } catch (err: any) {
       console.error("底层网络异常:", err);
-      return `[网络连接异常] 无法触达 AI 服务器。可能原因：\n1. 您当前的防火墙/VPN 拦截了请求\n2. API 基础路径填写错误。`;
+      return `[网络连接异常] 无法触达 AI 服务器，请检查网络环境。`;
     }
   },
 

@@ -39,9 +39,11 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onSave }) => {
     setTestResult({msg: '正在建立连接...', type: 'none'});
     
     try {
-      const result = await geminiService.callAI("Hi", formData, "You are a connectivity tester. Reply with 'OK'.");
-      if (result.includes("OK") || (result.length > 0 && !result.includes("报警") && !result.includes("失败"))) {
-        setTestResult({msg: '连接成功！API Key 有效且额度充足。', type: 'success'});
+      // 这里的 result 如果返回了 "[系统报警]" 字符串，说明根本没发出去
+      const result = await geminiService.callAI("Connectivity test. Reply exactly with 'CONNECTED'.", formData, "You are a connectivity tester.");
+      
+      if (result.includes("CONNECTED") || (result.length > 5 && !result.includes("[系统") && !result.includes("[鉴权") && !result.includes("[接口"))) {
+        setTestResult({msg: '连接成功！API Key 响应正常。', type: 'success'});
       } else {
         setTestResult({msg: result, type: 'error'});
       }
@@ -53,11 +55,11 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onSave }) => {
   };
 
   const commonModels = [
+    'google/gemini-3-flash-preview',
     'google/gemini-2.0-flash-001',
     'google/gemini-pro-1.5',
     'anthropic/claude-3.5-sonnet',
-    'deepseek/deepseek-chat',
-    'meta-llama/llama-3.1-8b-instruct:free'
+    'deepseek/deepseek-chat'
   ];
 
   return (
@@ -145,7 +147,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onSave }) => {
             <div>
               {saveStatus === 'success' && (
                 <span className="text-green-600 text-sm font-bold flex items-center gap-1">
-                  ✓ 配置已存入浏览器本地并生效
+                  ✓ 配置已同步并存入浏览器缓存
                 </span>
               )}
             </div>
@@ -167,9 +169,9 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onSave }) => {
         <div>
           <h4 className="text-sm font-bold text-blue-900">配置建议</h4>
           <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-            1. 请确保您的 OpenRouter Key 已绑定信用卡或已预充值。<br/>
-            2. 如果在心理测评页面仍看到“User not found”，请点击本页面的“测试连接”确认状态。<br/>
-            3. 本系统配置仅存储在您的浏览器 LocalStorage 中，不会上传至第三方服务器。
+            1. 如果在心理测评页面仍看到异常，请在“系统设置”页面重新点击一次“保存配置”。<br/>
+            2. 确保您的 Key 在 OpenRouter 后台处于 Active 状态并拥有足够的 Credits。<br/>
+            3. 您目前使用的模型为：<b>google/gemini-3-flash-preview</b>。
           </p>
         </div>
       </div>
