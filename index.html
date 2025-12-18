@@ -12,6 +12,18 @@
             font-family: 'Noto Sans SC', sans-serif;
             background-color: #f8fafc;
         }
+        .confidential-watermark {
+            pointer-events: none;
+            user-select: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 8rem;
+            color: rgba(0, 0, 0, 0.03);
+            z-index: 0;
+            white-space: nowrap;
+        }
     </style>
 <script type="importmap">
 {
@@ -27,5 +39,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <div class="confidential-watermark">内部绝密 · 严禁外泄</div>
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>

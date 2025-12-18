@@ -1,15 +1,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { PsychTestReport, PersonalInfo } from '../types';
+import { PsychTestReport, PersonalInfo, SystemConfig } from '../types';
 import { geminiService } from '../geminiService';
 
 interface PsychTestPageProps {
   reports: PsychTestReport[];
   onAddReport: (report: PsychTestReport) => void;
   officerInfo?: PersonalInfo;
+  systemConfig: SystemConfig;
 }
 
-const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, officerInfo }) => {
+const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, officerInfo, systemConfig }) => {
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -39,16 +40,15 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
     setIsTyping(true);
 
     try {
-      const response = await geminiService.getPsychTestResponse(newMsgs, officerInfo, round + 1);
+      const response = await geminiService.getPsychTestResponse(newMsgs, officerInfo, round + 1, systemConfig);
       setMessages([...newMsgs, { role: 'model', text: response }]);
       
       if (round >= 10) {
         setIsFinished(true);
-        // Process final report
         const finalReport: PsychTestReport = {
           id: Date.now().toString(),
           date: new Date().toLocaleDateString(),
-          score: 85, // Mock score for demo
+          score: 88,
           level: '优良',
           content: response,
           messages: [...newMsgs, { role: 'model', text: response }]
@@ -68,49 +68,50 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
     <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-120px)]">
       <div className="bg-white p-4 border border-slate-200 rounded-t-xl shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-xl overflow-hidden border-2 border-blue-500">
+          <div className="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center text-xl overflow-hidden shadow-inner">
              👮
           </div>
           <div>
-            <h3 className="font-bold text-slate-800">警小伴 (AI 心理评估)</h3>
-            <p className="text-xs text-slate-400">专业、亲切、懂基层的心理辅导员</p>
+            <h3 className="font-bold text-slate-800">警小伴 AI 心理研判</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">隐蔽式评估模式开启中</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] text-slate-400 uppercase font-bold">测评进度 {Math.min(round, 10)}/10</span>
-            <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+            <span className="text-[10px] text-slate-500 font-bold">测评轮次 {Math.min(round, 10)}/10</span>
+            <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1 border">
               <div 
-                className="h-full bg-blue-600 transition-all duration-500" 
+                className="h-full bg-blue-700 transition-all duration-500" 
                 style={{ width: `${(round / 10) * 100}%` }}
               ></div>
             </div>
           </div>
           <button 
             onClick={startNewTest}
-            className="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-bold text-slate-600 transition-colors"
+            className="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-bold text-slate-600 border transition-all"
           >
-            新测试
+            重启对话
           </button>
         </div>
       </div>
 
       <div 
         ref={scrollRef}
-        className="flex-1 bg-slate-50 border-x border-slate-200 overflow-y-auto p-6 space-y-4"
+        className="flex-1 bg-[#f9fafb] border-x border-slate-200 overflow-y-auto p-6 space-y-4 shadow-inner"
       >
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center space-y-4">
-            <div className="text-6xl grayscale opacity-20">👮</div>
-            <p className="max-w-xs">点击右上角“新测试”开始一次自然的聊天评估，10轮对话后将生成专业报告。</p>
+          <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center space-y-4 py-20">
+            <div className="text-6xl opacity-10">🛡️</div>
+            <p className="max-w-xs text-sm">系统将通过 10 轮深度对话，从职业压力、家庭支持等 5 个维度生成心理底色分析。</p>
+            <button onClick={startNewTest} className="mt-4 px-8 py-3 bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">开始新测评</button>
           </div>
         ) : (
           messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+              <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
                 m.role === 'user' 
                 ? 'bg-blue-700 text-white rounded-tr-none' 
-                : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                : 'bg-white text-slate-800 rounded-tl-none border border-slate-200'
               }`}>
                 <div className="whitespace-pre-wrap">{m.text}</div>
               </div>
@@ -119,18 +120,17 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
         )}
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-slate-100 flex gap-1">
-              <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"></div>
-              <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-              <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+            <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-slate-200 flex gap-1">
+              <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+              <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
             </div>
           </div>
         )}
         {isFinished && (
-          <div className="bg-green-50 border border-green-200 p-6 rounded-xl text-center space-y-3 animate-fadeIn">
-            <div className="text-3xl">✅</div>
-            <h4 className="font-bold text-green-800">心理测评已完成</h4>
-            <p className="text-sm text-green-700">AI 已为您生成了本次测评报告。您可以在“历史记录”中随时查阅，也可以前往“心理疏导”模块与 AI 进行深度交流。</p>
+          <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl text-center space-y-3 animate-fadeIn">
+            <h4 className="font-bold text-blue-900">心理研判底稿已生成</h4>
+            <p className="text-sm text-blue-700">本次测评结果已存入个人档案，将作为思想动态研判的重要权项。</p>
           </div>
         )}
       </div>
@@ -143,13 +143,13 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
             onChange={e => setInputValue(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
             disabled={isFinished || messages.length === 0}
-            placeholder={messages.length === 0 ? "点击新测试开始..." : (isFinished ? "测试已结束" : "输入您想说的...")}
-            className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all"
+            placeholder={messages.length === 0 ? "点击开始开始..." : (isFinished ? "对话已结束" : "输入战友的心声...")}
+            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700 focus:bg-white transition-all text-sm"
           />
           <button 
             onClick={handleSend}
             disabled={isFinished || messages.length === 0 || isTyping}
-            className="bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white px-6 py-2 rounded-lg font-bold transition-colors shadow-lg shadow-blue-900/10"
+            className="bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white px-8 py-2 rounded-xl font-bold transition-all shadow-md active:translate-y-0.5"
           >
             发送
           </button>

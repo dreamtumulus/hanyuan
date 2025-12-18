@@ -14,7 +14,7 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v2';
+const STORAGE_KEY = 'jingxin_guardian_data_v3';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
@@ -104,6 +104,7 @@ const App: React.FC = () => {
         return (
           <ExamReportPage 
             reports={state.examReports[policeId] || []} 
+            systemConfig={state.systemConfig}
             onAdd={(r) => setState(prev => ({...prev, examReports: {...prev.examReports, [policeId]: [...(prev.examReports[policeId] || []), r]}}))} 
             onDelete={(id) => setState(prev => ({...prev, examReports: {...prev.examReports, [policeId]: prev.examReports[policeId].filter(r => r.id !== id)}}))}
           />
@@ -114,6 +115,7 @@ const App: React.FC = () => {
             reports={state.psychTestReports[policeId] || []} 
             onAddReport={(r) => setState(prev => ({...prev, psychTestReports: {...prev.psychTestReports, [policeId]: [...(prev.psychTestReports[policeId] || []), r]}}))}
             officerInfo={state.personalInfo[policeId]}
+            systemConfig={state.systemConfig}
           />
         );
       case 'psych-counseling':
@@ -122,6 +124,7 @@ const App: React.FC = () => {
             officerInfo={state.personalInfo[policeId]}
             exams={state.examReports[policeId] || []}
             psychReports={state.psychTestReports[policeId] || []}
+            systemConfig={state.systemConfig}
           />
         );
       case 'talk-entry':
@@ -153,9 +156,9 @@ const App: React.FC = () => {
           showBack={currentPath !== 'identity-select' && currentPath !== 'login'}
         />
       )}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {showSidebar && <Sidebar role={state.currentUser.role} currentPath={currentPath} onNavigate={navigate} />}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
           {renderContent()}
         </main>
       </div>
