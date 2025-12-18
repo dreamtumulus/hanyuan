@@ -8,8 +8,8 @@ export const geminiService = {
     // 强制清理配置中的非法字符
     const sanitizedKey = (config.openRouterKey || "").replace(/[^\x00-\x7F]/g, "").trim();
     
-    // 如果配置了有效的 OpenRouter Key（不论是默认的还是用户填写的）
-    if (sanitizedKey !== "" && sanitizedKey !== "sk-or-v1-") {
+    // 如果配置了有效的 OpenRouter Key
+    if (sanitizedKey !== "") {
       try {
         const sanitizedOrigin = window.location.origin.replace(/[^\x00-\x7F]/g, "");
         const sanitizedBaseUrl = (config.apiBaseUrl || "https://openrouter.ai/api/v1")
@@ -36,39 +36,43 @@ export const geminiService = {
         });
 
         const data = await response.json();
+        
         if (!response.ok) {
-           // 如果是 OpenRouter 报错，记录详细信息并尝试回退
-           console.error("OpenRouter API Error:", data.error);
+           console.error("OpenRouter API 错误响应:", data);
+           // 特殊错误处理：User not found 通常意味着 Key 无效或额度不足
+           if (data.error?.message?.includes("User not found")) {
+             throw new Error("API Key 已失效或用户未找到 (User not found)。请检查 OpenRouter 账户余额或更换 Key。");
+           }
            throw new Error(data.error?.message || `HTTP ${response.status}`);
         }
+        
         return data.choices?.[0]?.message?.content || "AI 响应内容为空";
       } catch (err: any) {
-        console.warn("OpenRouter 链路异常，尝试回退到 Native SDK:", err.message);
-        // 如果 OpenRouter 失败（比如 Key 过期或 User not found），这里不再直接返回错误，而是尝试回退
+        console.warn("OpenRouter 链路异常:", err.message);
+        // 如果有备用的 Native API Key，则尝试回退，否则向上抛出错误
+        if (!process.env.API_KEY) {
+          return `[系统报警] AI 链路异常: ${err.message}\n请管理员检查系统后台 API 设置。`;
+        }
       }
     }
 
-    // 回退方案：使用原生的 Gemini SDK (需要 Vercel 注入 process.env.API_KEY 或使用系统默认 Key 作为基础)
+    // 回退方案：使用原生的 Gemini SDK
     try {
-      // 这里的 process.env.API_KEY 是 Vercel 环境中配置的
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-      
-      // 如果没有原生 SDK 的 Key，则只能报错
-      if (!process.env.API_KEY) {
-        return `[系统提示] 默认 API 密钥可能已失效 (${sanitizedKey.substring(0, 10)}...)。请管理员在“系统设置”中更新有效的 OpenRouter API Key。`;
+      if (process.env.API_KEY) {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const fallbackModel = (config.preferredModel && !config.preferredModel.includes('/')) ? config.preferredModel : 'gemini-3-flash-preview';
+        
+        const response = await ai.models.generateContent({
+          model: fallbackModel,
+          contents: prompt,
+          config: systemInstruction ? { systemInstruction, temperature: 0.7 } : { temperature: 0.7 }
+        });
+        return response.text || "Gemini SDK 响应内容为空";
       }
-
-      const fallbackModel = (config.preferredModel && !config.preferredModel.includes('/')) ? config.preferredModel : 'gemini-3-flash-preview';
-      
-      const response = await ai.models.generateContent({
-        model: fallbackModel,
-        contents: prompt,
-        config: systemInstruction ? { systemInstruction, temperature: 0.7 } : { temperature: 0.7 }
-      });
-      return response.text || "Gemini SDK 响应内容为空";
+      return `[配置缺失] 系统未配置有效的 OpenRouter Key。请管理员在“系统设置”中完成配置。`;
     } catch (err: any) {
       console.error("SDK Fallback Error:", err);
-      return `[核心链路故障] 无法连接到 AI 服务。当前使用的 Key 可能已停用或额度用尽。请联系管理员更换全局配置。`;
+      return `[核心链路故障] 无法连接到任何 AI 服务。请检查网络或联系技术支持。`;
     }
   },
 

@@ -14,10 +14,13 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v6';
+const STORAGE_KEY = 'jingxin_guardian_data_v7';
 
-// 系统预设默认配置
-const SYSTEM_DEFAULT_CONFIG: SystemConfig = {
+/**
+ * 系统预设的“工厂配置”
+ * 当管理员未在后台配置时，所有用户默认使用此套配置
+ */
+const SYSTEM_FACTORY_CONFIG: SystemConfig = {
   openRouterKey: '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',
   preferredModel: 'google/gemini-3-flash-preview',
   apiBaseUrl: 'https://openrouter.ai/api/v1'
@@ -27,25 +30,31 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     
-    // 基础配置优先顺序：环境变量 > 代码内置默认
-    const baseConfig: SystemConfig = {
-      openRouterKey: (process.env as any).OPENROUTER_API_KEY || SYSTEM_DEFAULT_CONFIG.openRouterKey,
-      preferredModel: (process.env as any).PREFERRED_MODEL || SYSTEM_DEFAULT_CONFIG.preferredModel,
-      apiBaseUrl: (process.env as any).API_BASE_URL || SYSTEM_DEFAULT_CONFIG.apiBaseUrl
+    // 合并逻辑：环境变量 > 系统默认
+    const defaultEnvConfig: SystemConfig = {
+      openRouterKey: (process.env as any).OPENROUTER_API_KEY || SYSTEM_FACTORY_CONFIG.openRouterKey,
+      preferredModel: (process.env as any).PREFERRED_MODEL || SYSTEM_FACTORY_CONFIG.preferredModel,
+      apiBaseUrl: (process.env as any).API_BASE_URL || SYSTEM_FACTORY_CONFIG.apiBaseUrl
     };
 
     if (saved) {
       const parsed = JSON.parse(saved);
-      // 合并逻辑：如果用户保存的 Key 为空字符串，则回退到 baseConfig 的默认值
+      // 深度合并配置：如果用户保存的配置项为空，则回退到 defaultEnvConfig
       const mergedConfig: SystemConfig = {
-        openRouterKey: parsed.systemConfig?.openRouterKey || baseConfig.openRouterKey,
-        preferredModel: parsed.systemConfig?.preferredModel || baseConfig.preferredModel,
-        apiBaseUrl: parsed.systemConfig?.apiBaseUrl || baseConfig.apiBaseUrl,
+        openRouterKey: (parsed.systemConfig?.openRouterKey && parsed.systemConfig.openRouterKey.trim() !== "") 
+          ? parsed.systemConfig.openRouterKey 
+          : defaultEnvConfig.openRouterKey,
+        preferredModel: (parsed.systemConfig?.preferredModel && parsed.systemConfig.preferredModel.trim() !== "")
+          ? parsed.systemConfig.preferredModel
+          : defaultEnvConfig.preferredModel,
+        apiBaseUrl: (parsed.systemConfig?.apiBaseUrl && parsed.systemConfig.apiBaseUrl.trim() !== "")
+          ? parsed.systemConfig.apiBaseUrl
+          : defaultEnvConfig.apiBaseUrl,
       };
       return { ...parsed, systemConfig: mergedConfig };
     }
 
-    // 默认初始账号
+    // 初始默认账号
     const defaultAccounts: Record<string, UserAccount> = {
       'admin': { username: 'admin', password: 'xiaoyuan', role: UserRole.ADMIN, name: '管理员' },
       'xiaoyuantest': { username: 'xiaoyuantest', password: '123456', role: 'MULTIPLE', name: '演示账号' },
@@ -66,7 +75,7 @@ const App: React.FC = () => {
       psychTestReports: {},
       talkRecords: [],
       analysisReports: {},
-      systemConfig: baseConfig
+      systemConfig: defaultEnvConfig
     };
   });
 
@@ -133,14 +142,7 @@ const App: React.FC = () => {
           policeId: record.policeId,
           department: '基层科所队',
           position: '待定',
-          gender: '男',
-          age: '',
-          idCard: '',
-          hometown: '',
-          address: '',
-          phone: '',
-          email: '',
-          family: []
+          gender: '男', age: '', idCard: '', hometown: '', address: '', phone: '', email: '', family: []
         };
         
         updatedAccounts[record.policeId] = {
