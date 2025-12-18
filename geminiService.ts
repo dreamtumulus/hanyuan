@@ -5,62 +5,77 @@ import { REPORT_GENERATION_PROMPT } from "./constants";
 
 export const geminiService = {
   async callAI(prompt: string, config: SystemConfig, systemInstruction?: string) {
-    // If OpenRouter key is configured, use OpenRouter API
-    if (config.openRouterKey) {
-      const response = await fetch(`${config.apiBaseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${config.openRouterKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: config.preferredModel,
-          messages: [
-            ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
-            { role: "user", content: prompt }
-          ]
-        })
-      });
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || "API 返回异常";
+    // 优先检查是否配置了 OpenRouter (通过 API Key 判断)
+    if (config.openRouterKey && config.openRouterKey.trim() !== "") {
+      try {
+        const response = await fetch(`${config.apiBaseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${config.openRouterKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": window.location.origin, // OpenRouter 要求的域名标识
+            "X-Title": "警心卫士系统"
+          },
+          body: JSON.stringify({
+            model: config.preferredModel,
+            messages: [
+              ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.7,
+            top_p: 0.9
+          })
+        });
+
+        const data = await response.json();
+        if (data.error) {
+          console.error("OpenRouter Error:", data.error);
+          throw new Error(data.error.message || "OpenRouter 接口返回错误");
+        }
+        return data.choices?.[0]?.message?.content || "AI 响应解析失败";
+      } catch (err: any) {
+        console.warn("OpenRouter 链路异常，尝试本地回退:", err.message);
+        return `[系统警告] OpenRouter 接入失败: ${err.message}。请检查 API Key 余额。`;
+      }
     }
 
-    // Default to Gemini SDK
-    // Initialize with guaranteed process.env.API_KEY
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: config.preferredModel.includes("/") ? 'gemini-3-pro-preview' : config.preferredModel,
-      contents: prompt,
-      config: systemInstruction ? { systemInstruction } : undefined
-    });
-    return response.text || "";
+    // 回退方案：使用原生的 Gemini SDK (需要 Vercel 注入 process.env.API_KEY)
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // 如果 PreferredModel 看起来像 OpenRouter 路径，回退时使用默认的 Flash
+      const fallbackModel = config.preferredModel.includes('/') ? 'gemini-3-flash-preview' : config.preferredModel;
+      
+      const response = await ai.models.generateContent({
+        model: fallbackModel,
+        contents: prompt,
+        config: systemInstruction ? { systemInstruction, temperature: 0.7 } : { temperature: 0.7 }
+      });
+      return response.text || "Gemini SDK 响应内容为空";
+    } catch (err: any) {
+      console.error("SDK Fallback Error:", err);
+      return `[核心链路故障] 无法连接到 AI 服务，请在系统设置中配置 OpenRouter。`;
+    }
   },
 
   async analyzeExamReport(content: string, config: SystemConfig, history?: string) {
-    const prompt = `【体检数据动态研判】
-分析以下警员的体检数据，结合历史记录评估其适岗能力：
-内容：${content}
-历史背景：${history || '首次录入'}`;
-    return this.callAI(prompt, config, "你是一名警队健康管理专家。");
+    const prompt = `【生理研判指令】\n分析以下体检数据，对比历史趋势，评估其高压勤务适岗度。\n当前数据：${content}\n历史参考：${history || '无'}`;
+    return this.callAI(prompt, config, "你是一名警务职业健康专家。");
   },
 
   async getPsychTestResponse(messages: { role: 'user' | 'model'; text: string }[], officerInfo: any, round: number, config: SystemConfig) {
-    const systemInstruction = `你是警务心理咨询师。这是第 ${round} 轮对话。当前警员：${JSON.stringify(officerInfo)}. 
-请以战友式、接地气的语气交流，严禁打官腔。第10轮需输出正式评估报告。`;
-    
-    const prompt = messages[messages.length - 1].text;
-    return this.callAI(prompt, config, systemInstruction);
+    const systemInstruction = `你是心理疏导员。这是第 ${round} 轮隐蔽式对话。当前对象：${officerInfo?.name || '匿名民警'}。请以战友语气进行压力评估。`;
+    const lastMessage = messages[messages.length - 1].text;
+    return this.callAI(lastMessage, config, systemInstruction);
   },
 
   async generateComprehensiveReport(data: { officer: any, exams: any[], psychs: any[], talks: any[] }, config: SystemConfig) {
-    const prompt = `【原始数据汇聚】
-1. 个人档案：${JSON.stringify(data.officer)}
-2. 体检分析：${JSON.stringify(data.exams.map(e => e.analysis))}
-3. 心理底色：${JSON.stringify(data.psychs.map(p => p.content))}
-4. 谈话记录：${JSON.stringify(data.talks)}
-
-请基于以上数据生成《全维度思想研判报告》。`;
-
-    return this.callAI(prompt, config, REPORT_GENERATION_PROMPT);
+    const context = `
+    民警姓名: ${data.officer?.name}
+    部门职位: ${data.officer?.dept || data.officer?.department} / ${data.officer?.position}
+    体检记录: ${JSON.stringify(data.exams.map(e => e.analysis))}
+    心理测评总结: ${JSON.stringify(data.psychs.map(p => p.content))}
+    谈话风险标记: ${JSON.stringify(data.talks)}
+    `;
+    return this.callAI(context, config, REPORT_GENERATION_PROMPT);
   }
 };

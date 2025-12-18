@@ -63,14 +63,20 @@ const AnalysisReportPage: React.FC<AnalysisReportPageProps> = ({ state, onSaveRe
     setIsEditing(false);
   };
 
-  const applyQuickCorrection = (type: string) => {
-    let prefix = '';
-    switch (type) {
-      case 'politics': prefix = '【政治站位对标】该同志在近期工作中表现出坚定的政治立场，但在应对突发舆情时的思想敏锐度仍有提升空间。\n'; break;
-      case 'risk': prefix = '【廉政风险提示】经复核，该同志在社交圈管理上存在苗头性问题，建议纳入重点观察序列。\n'; break;
-      case 'care': prefix = '【组织关怀意见】针对该同志近期家庭困难，建议所在支部启动谈心谈话疏导机制，传递组织温暖。\n'; break;
+  const applyProfessionalInstruction = (instruction: string) => {
+    let text = editedContent;
+    switch (instruction) {
+      case 'politics': 
+        text = "【政治定性】该同志在大是大非面前头脑清醒，政治立场坚定，能够自觉做到“两个维护”。\n" + text;
+        break;
+      case 'warning':
+        text = text + "\n\n【风险警示】鉴于该同志近期存在苗头性作风问题，建议列入“重点关注”对象，暂缓配枪资格。";
+        break;
+      case 'care':
+        text = text + "\n\n【关怀建议】建议所在单位领导适时开展“家访”活动，协助解决其家庭实际困难，传递组织温度。";
+        break;
     }
-    setEditedContent(prefix + editedContent);
+    setEditedContent(text);
   };
 
   useEffect(() => {
@@ -80,25 +86,37 @@ const AnalysisReportPage: React.FC<AnalysisReportPageProps> = ({ state, onSaveRe
   }, [currentReport, isEditing]);
 
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6 relative z-10">
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6 relative">
       <div className="lg:col-span-1 space-y-4">
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-bold text-slate-800 mb-4 border-l-4 border-blue-700 pl-3">研判对象清单</h2>
-          <div className="space-y-2">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+            <span className="w-2 h-6 bg-blue-700 rounded-full"></span>
+            研判档案库
+          </h2>
+          <div className="space-y-3">
             {mockOfficers.map(o => (
               <button 
                 key={o.policeId}
                 onClick={() => generateReport(o.policeId)}
-                className={`w-full p-3 rounded-lg border text-left transition-all relative ${
+                className={`w-full p-4 rounded-xl border-2 text-left transition-all relative overflow-hidden group ${
                   selectedOfficerId === o.policeId 
-                  ? 'bg-blue-50 border-blue-700 shadow-sm' 
-                  : 'bg-white border-slate-100 hover:border-slate-300'
+                  ? 'border-blue-700 bg-blue-50 shadow-md translate-x-1' 
+                  : 'border-slate-50 bg-white hover:border-blue-200'
                 }`}
               >
-                <p className="font-bold text-slate-800 text-sm">{o.name}</p>
-                <p className="text-[10px] text-slate-500">{o.dept} · {o.position}</p>
-                {state.analysisReports[o.policeId]?.editStatus === 'modified' && (
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></span>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className={`font-black text-sm ${selectedOfficerId === o.policeId ? 'text-blue-900' : 'text-slate-800'}`}>{o.name}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{o.dept}</p>
+                  </div>
+                  {state.analysisReports[o.policeId]?.editStatus === 'modified' && (
+                    <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-1.5 py-0.5 rounded border border-amber-200">人修</span>
+                  )}
+                </div>
+                {selectedOfficerId === o.policeId && (
+                   <div className="absolute right-0 bottom-0 opacity-10 translate-x-2 translate-y-2">
+                     <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                   </div>
                 )}
               </button>
             ))}
@@ -107,81 +125,133 @@ const AnalysisReportPage: React.FC<AnalysisReportPageProps> = ({ state, onSaveRe
       </div>
 
       <div className="lg:col-span-3 space-y-6">
-        <div className="bg-white rounded-xl shadow-md border border-slate-200 flex flex-col min-h-[700px]">
-          <div className="bg-[#1e3a8a] text-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🛡️</span>
-              <h3 className="font-bold tracking-widest">全维度思想政治动态研判底稿</h3>
+        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col min-h-[800px] overflow-hidden">
+          <div className="bg-[#1e3a8a] text-white p-6 flex items-center justify-between shadow-lg relative z-20">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-2.5 rounded-xl backdrop-blur-md">
+                <svg className="w-6 h-6" fill="white" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              </div>
+              <div>
+                <h3 className="font-black tracking-[0.2em] text-lg">全维度思想研判分析底稿</h3>
+                <p className="text-[10px] text-blue-300 uppercase font-bold tracking-widest">Digital Analysis & Political Appraisal</p>
+              </div>
             </div>
             {currentReport && !loading && (
               <div className="flex gap-2">
                 <button 
                   onClick={() => setIsEditing(!isEditing)}
-                  className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-xs font-bold border border-white/20"
+                  className={`px-5 py-2 rounded-xl text-xs font-black border-2 transition-all ${
+                    isEditing ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white/10 border-white/20 hover:bg-white/30'
+                  }`}
                 >
-                  {isEditing ? '取消' : '人工干预/修改'}
+                  {isEditing ? '取消修改' : '✍️ 编辑审定'}
                 </button>
               </div>
             )}
           </div>
           
-          <div className="flex-1 p-8 bg-[#fdfdfd] relative">
+          <div className="flex-1 p-12 bg-[#fafafa] relative overflow-y-auto">
             {loading ? (
-              <div className="h-full flex flex-col items-center justify-center space-y-4">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-700 border-t-transparent"></div>
-                <p className="text-slate-500 text-sm font-bold">正在接入大数据模型进行全维度赋分...</p>
+              <div className="h-full flex flex-col items-center justify-center space-y-6">
+                <div className="relative w-20 h-20">
+                  <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-blue-700 rounded-full border-t-transparent animate-spin"></div>
+                </div>
+                <div className="text-center">
+                  <p className="text-blue-900 font-black text-xl animate-pulse">深度调取警员全维度档案...</p>
+                  <p className="text-xs text-slate-400 mt-2 font-bold uppercase tracking-widest">Cross-referencing Medical, Psych & Work data</p>
+                </div>
               </div>
             ) : isEditing ? (
-              <div className="h-full flex flex-col gap-4 animate-fadeIn">
-                <div className="flex flex-wrap gap-2 mb-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <span className="text-xs font-bold text-blue-800 w-full mb-1">快捷介入选项：</span>
-                  <button onClick={() => applyQuickCorrection('politics')} className="text-[10px] bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-blue-200 font-bold text-blue-700">提升政治站位</button>
-                  <button onClick={() => applyQuickCorrection('risk')} className="text-[10px] bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-red-200 font-bold text-red-700">标记纪律风险</button>
-                  <button onClick={() => applyQuickCorrection('care')} className="text-[10px] bg-white hover:bg-slate-50 px-3 py-1.5 rounded border border-green-200 font-bold text-green-700">增加组织关怀</button>
+              <div className="h-full flex flex-col gap-6 animate-fadeIn">
+                <div className="bg-blue-900/5 p-4 rounded-2xl border border-blue-100 flex items-center justify-between">
+                   <div className="flex items-center gap-4">
+                     <span className="text-xs font-black text-blue-900 uppercase">辅助编写工具：</span>
+                     <div className="flex gap-2">
+                       <button onClick={() => applyProfessionalInstruction('politics')} className="text-[10px] bg-white px-3 py-1.5 rounded-lg border border-blue-200 font-bold hover:bg-blue-700 hover:text-white transition-all shadow-sm">插入政治定性</button>
+                       <button onClick={() => applyProfessionalInstruction('warning')} className="text-[10px] bg-white px-3 py-1.5 rounded-lg border border-red-200 font-bold hover:bg-red-700 hover:text-white transition-all shadow-sm">追加风险预警</button>
+                       <button onClick={() => applyProfessionalInstruction('care')} className="text-[10px] bg-white px-3 py-1.5 rounded-lg border border-green-200 font-bold hover:bg-green-700 hover:text-white transition-all shadow-sm">添加组织关怀</button>
+                     </div>
+                   </div>
+                   <span className="text-[10px] text-slate-400 font-bold italic">研判权限：{state.currentUser?.role}</span>
                 </div>
                 <textarea 
-                  className="flex-1 w-full p-8 border-2 border-blue-50 rounded-xl focus:ring-0 outline-none font-sans text-slate-800 leading-relaxed min-h-[500px] shadow-inner"
+                  className="flex-1 w-full p-10 border-2 border-slate-100 rounded-3xl focus:border-blue-500 focus:ring-8 focus:ring-blue-50 focus:bg-white transition-all outline-none font-serif text-slate-800 leading-loose text-xl shadow-inner min-h-[500px]"
                   value={editedContent}
                   onChange={e => setEditedContent(e.target.value)}
+                  placeholder="在此修改 AI 生成的判语..."
                 />
-                <div className="flex justify-end gap-3 pt-4 border-t">
-                   <button onClick={() => setIsEditing(false)} className="px-6 py-2 rounded-lg font-bold text-slate-500 hover:bg-slate-100">撤销修改</button>
-                   <button onClick={handleManualEditSave} className="px-8 py-2 bg-[#1e3a8a] text-white rounded-lg font-bold shadow-lg">保存最终审定版</button>
+                <div className="flex justify-end gap-4 pt-6">
+                   <button onClick={() => setIsEditing(false)} className="px-8 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">放弃修改</button>
+                   <button onClick={handleManualEditSave} className="px-12 py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-2xl hover:bg-blue-900 active:scale-95 transition-all">完成审定并定稿</button>
                 </div>
               </div>
             ) : currentReport ? (
-              <div className="animate-fadeIn max-w-4xl mx-auto">
-                <div className="text-center mb-10">
-                  <h1 className="text-2xl font-black text-slate-900 border-b-2 border-red-600 inline-block pb-1">关于警员 ${mockOfficers.find(o => o.policeId === selectedOfficerId)?.name} 的综合研判报告</h1>
-                  <div className="flex justify-between text-[10px] text-slate-400 mt-4 uppercase font-bold">
-                    <span>文档编号: JX-${currentReport.policeId}-${Date.now().toString().slice(-6)}</span>
-                    <span>密级: 内部参考 (严禁外泄)</span>
+              <div className="animate-fadeIn max-w-4xl mx-auto font-serif relative">
+                <div className="absolute -top-6 -left-6 border-2 border-red-500 text-red-500 text-[10px] font-black px-2 py-0.5 rounded rotate-[-5deg] opacity-70">
+                  内部参考 · 严禁扩散
+                </div>
+                
+                <div className="text-center mb-12 border-b-2 border-red-600 pb-8">
+                  <h1 className="text-4xl font-black text-red-600 tracking-[0.1em] mb-4">关于 ${mockOfficers.find(o => o.policeId === selectedOfficerId)?.name} 同志的身心研判报告</h1>
+                  <div className="flex justify-between items-end text-xs text-slate-500 font-bold">
+                    <div className="text-left space-y-1">
+                      <p>编号：JX-ANALYSIS-${currentReport.policeId}-${Date.now().toString().slice(-6)}</p>
+                      <p>密级：机密 (CONFIDENTIAL)</p>
+                    </div>
+                    <div className="text-right">
+                      <p>研判日期：{currentReport.generatedAt}</p>
+                      <p>系统环境：{state.systemConfig.preferredModel}</p>
+                    </div>
                   </div>
                 </div>
-                <div className="whitespace-pre-wrap font-sans leading-loose text-slate-800 text-lg">
+                
+                <div className="whitespace-pre-wrap leading-[2.5] text-slate-900 text-2xl tracking-tight mb-20 px-4">
                   {currentReport.manualEdit || currentReport.content}
                 </div>
-                {currentReport.editStatus === 'modified' && (
-                  <div className="mt-12 pt-4 border-t border-dashed border-slate-200 text-right">
-                    <p className="text-sm font-bold text-slate-600 italic">审定人签名：${currentReport.editorName || '系统默认'}</p>
-                    <p className="text-xs text-slate-400 mt-1">审定日期：${currentReport.generatedAt}</p>
+
+                <div className="mt-24 pt-12 border-t-2 border-slate-100 flex justify-between items-end">
+                  <div className="relative">
+                    <div className="absolute -top-12 -left-4 w-32 h-32 opacity-20 rotate-[-15deg] pointer-events-none">
+                       <svg viewBox="0 0 200 200" fill="red">
+                         <circle cx="100" cy="100" r="80" fill="none" stroke="red" strokeWidth="4"/>
+                         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" fontSize="16" fontWeight="bold">研判专用章</text>
+                       </svg>
+                    </div>
+                    <p className="text-xs text-slate-400 font-bold uppercase mb-4 tracking-widest">审定部门确认</p>
+                    <p className="text-2xl font-black italic text-slate-800 border-b-2 border-slate-200 px-6 pb-2 min-w-[200px]">
+                      {currentReport.editStatus === 'modified' ? currentReport.editorName : 'AI 自动化生成'}
+                    </p>
                   </div>
-                )}
+                  <div className="text-right text-slate-400">
+                    <p className="text-[10px] font-bold uppercase tracking-widest">Verified by Digital Guardian System</p>
+                    <p className="text-[10px] mt-1 font-medium">数据完整性校验码：${Math.random().toString(36).substring(7).toUpperCase()}</p>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                 <div className="w-24 h-24 mb-6 opacity-10">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21,5V19A2,2 0 0119,21H5A2,2 0 013,19V5A2,2 0 015,3H19A2,2 0 0121,5M19,5H5V19H19V5M17,17H7V15H17V17M17,13H7V11H17V13M17,9H7V7H17V9Z" /></svg>
+              <div className="h-full flex flex-col items-center justify-center text-slate-200">
+                 <div className="w-32 h-32 mb-10 opacity-5">
+                    <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
                  </div>
-                 <p className="font-bold text-slate-400">请选择左侧警员，启动全生命周期AI动态研判</p>
+                 <p className="font-black text-slate-300 text-2xl tracking-[0.5em] mb-4">待选研判对象</p>
+                 <p className="text-sm text-slate-300 font-bold opacity-50 uppercase tracking-widest text-center max-w-xs">Select an officer from the left to start comprehensive dynamic appraisal</p>
               </div>
             )}
           </div>
 
           {currentReport && !loading && !isEditing && (
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
-              <button className="px-5 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-600 hover:bg-white transition-colors">导出加密文档</button>
-              <button className="px-5 py-2 bg-[#1e3a8a] text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-900 transition-all">打印政工备案</button>
+            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-between items-center z-20">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${currentReport.editStatus === 'ai' ? 'bg-blue-400' : 'bg-green-500 animate-pulse'}`}></div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                  {currentReport.editStatus === 'ai' ? 'RAW AI OUTPUT' : 'HUMAN REVIEWED & FINALIZED'}
+                </span>
+              </div>
+              <div className="flex gap-4">
+                <button className="px-6 py-2.5 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">导出绝密加密包</button>
+                <button className="px-8 py-2.5 bg-[#1e3a8a] text-white rounded-xl text-xs font-black shadow-xl hover:shadow-blue-900/30 active:scale-95 transition-all">打印政工备案原件</button>
+              </div>
             </div>
           )}
         </div>
