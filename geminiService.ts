@@ -1,83 +1,62 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { SystemConfig } from "./types";
 import { REPORT_GENERATION_PROMPT } from "./constants";
 
 export const geminiService = {
+  /**
+   * 核心 AI 调用逻辑：仅依赖 OpenRouter 链路
+   * 不再读取 process.env，所有参数通过 config 传入
+   */
   async callAI(prompt: string, config: SystemConfig, systemInstruction?: string) {
-    const sanitizedKey = (config.openRouterKey || "").replace(/[^\x00-\x7F]/g, "").trim();
+    const key = (config.openRouterKey || "").trim();
     
-    // 尝试 OpenRouter 路径
-    if (sanitizedKey !== "") {
-      try {
-        const sanitizedOrigin = window.location.origin.replace(/[^\x00-\x7F]/g, "");
-        const sanitizedBaseUrl = (config.apiBaseUrl || "https://openrouter.ai/api/v1")
-          .trim()
-          .replace(/[^\x00-\x7F]/g, "")
-          .replace(/\/$/, "");
-
-        const response = await fetch(`${sanitizedBaseUrl}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${sanitizedKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": sanitizedOrigin,
-            "X-Title": "JingXin Guardian System" 
-          },
-          body: JSON.stringify({
-            model: config.preferredModel || "google/gemini-2.0-flash-001",
-            messages: [
-              ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
-              { role: "user", content: prompt }
-            ],
-            temperature: 0.7
-          })
-        });
-
-        const data = await response.json();
-        
-        if (response.ok) {
-          return data.choices?.[0]?.message?.content || "AI 响应内容为空";
-        } else {
-          // 如果 OpenRouter 报错 (例如 User not found)，记录警告并触发回退
-          console.warn("OpenRouter API 报错，准备切换至原生 SDK:", data.error?.message);
-          if (!process.env.API_KEY) {
-             throw new Error(data.error?.message || "OpenRouter 密钥异常且无备用 SDK 密钥");
-          }
-        }
-      } catch (err: any) {
-        console.warn("OpenRouter 访问受限，正在尝试 Native Gemini SDK 回退...");
-        if (!process.env.API_KEY) {
-          return `[系统报警] AI 链路异常且未配置备用密钥: ${err.message}`;
-        }
-      }
+    if (!key) {
+      return "[系统提示] 未配置 API Key。请联系管理员在“系统设置”中输入有效的 OpenRouter Key。";
     }
 
-    // 回退方案：原生 Gemini SDK (必须存在 process.env.API_KEY)
     try {
-      if (process.env.API_KEY) {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        // 确保模型名称兼容 Native SDK (去掉 OpenRouter 的前缀)
-        let nativeModel = config.preferredModel || 'gemini-3-flash-preview';
-        if (nativeModel.includes('/')) {
-          nativeModel = nativeModel.split('/').pop() || 'gemini-3-flash-preview';
+      const sanitizedBaseUrl = (config.apiBaseUrl || "https://openrouter.ai/api/v1")
+        .trim()
+        .replace(/\/$/, "");
+
+      const response = await fetch(`${sanitizedBaseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "X-Title": "JingXin Guardian"
+        },
+        body: JSON.stringify({
+          model: config.preferredModel || "google/gemini-2.0-flash-001",
+          messages: [
+            ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.7
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        return data.choices?.[0]?.message?.content || "AI 响应内容为空";
+      } else {
+        console.error("OpenRouter API 错误:", data);
+        const errorMsg = data.error?.message || `HTTP ${response.status}`;
+        
+        if (errorMsg.includes("User not found") || errorMsg.includes("invalid_api_key")) {
+          return `[系统报警] API Key 已失效或用户不存在。请管理员登录后台更换有效的 OpenRouter Key。 (错误详情: ${errorMsg})`;
         }
-        // 如果是特殊的 exp 模型或 flash 模型，确保名称规范
-        if (!nativeModel.startsWith('gemini-')) {
-          nativeModel = 'gemini-3-flash-preview';
+        
+        if (errorMsg.includes("Insufficient balance") || errorMsg.includes("credits")) {
+          return `[系统报警] OpenRouter 账户余额不足，请及时充值。`;
         }
 
-        const response = await ai.models.generateContent({
-          model: nativeModel,
-          contents: prompt,
-          config: systemInstruction ? { systemInstruction, temperature: 0.7 } : { temperature: 0.7 }
-        });
-        return response.text || "Gemini SDK 响应内容为空";
+        return `[AI 调用失败] ${errorMsg}`;
       }
-      return `[配置缺失] 无法连接 AI。OpenRouter Key 可能无效，且系统未在环境变量中配置 process.env.API_KEY。`;
     } catch (err: any) {
-      console.error("Native SDK Final Fallback Error:", err);
-      return `[核心链路故障] 您的 API Key 可能已超额或不可用。请在“系统设置”中尝试更换为有效的 OpenRouter Key。`;
+      console.error("网络请求异常:", err);
+      return `[网络异常] 无法连接到 AI 服务，请检查网络状况或 API 基础路径配置。`;
     }
   },
 

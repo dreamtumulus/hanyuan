@@ -14,16 +14,15 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v8';
+const STORAGE_KEY = 'jingxin_guardian_data_v9';
 
 /**
- * 系统预设的“工厂配置”
- * 注意：由于 OpenRouter Key 容易失效，默认配置改为空，
- * 这样系统会自动回退到使用 Vercel 环境变量中配置的 process.env.API_KEY (Native Gemini)
+ * 【核心配置】系统自设的 OpenRouter Key
+ * 移除 process.env 依赖，直接从这里读取默认值
  */
 const SYSTEM_FACTORY_CONFIG: SystemConfig = {
-  openRouterKey: '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', // 留空以触发 Native Gemini 回退
-  preferredModel: 'gemini-3-flash-preview',
+  openRouterKey: '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',
+  preferredModel: 'google/gemini-3-flash-preview',
   apiBaseUrl: 'https://openrouter.ai/api/v1'
 };
 
@@ -31,20 +30,16 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     
-    // 基础环境配置
-    const defaultEnvConfig: SystemConfig = {
-      openRouterKey: (process.env as any).OPENROUTER_API_KEY || SYSTEM_FACTORY_CONFIG.openRouterKey,
-      preferredModel: (process.env as any).PREFERRED_MODEL || SYSTEM_FACTORY_CONFIG.preferredModel,
-      apiBaseUrl: (process.env as any).API_BASE_URL || SYSTEM_FACTORY_CONFIG.apiBaseUrl
-    };
+    // 初始化配置：不再读取环境变量，直接使用工厂设置
+    const initialConfig = { ...SYSTEM_FACTORY_CONFIG };
 
     if (saved) {
       const parsed = JSON.parse(saved);
-      // 合并配置：如果用户自定义了 Key 则使用，否则使用环境默认值
+      // 如果用户在“系统设置”里改过，则优先使用用户保存的配置
       const mergedConfig: SystemConfig = {
-        openRouterKey: parsed.systemConfig?.openRouterKey ?? defaultEnvConfig.openRouterKey,
-        preferredModel: parsed.systemConfig?.preferredModel || defaultEnvConfig.preferredModel,
-        apiBaseUrl: parsed.systemConfig?.apiBaseUrl || defaultEnvConfig.apiBaseUrl,
+        openRouterKey: parsed.systemConfig?.openRouterKey || initialConfig.openRouterKey,
+        preferredModel: parsed.systemConfig?.preferredModel || initialConfig.preferredModel,
+        apiBaseUrl: parsed.systemConfig?.apiBaseUrl || initialConfig.apiBaseUrl,
       };
       return { ...parsed, systemConfig: mergedConfig };
     }
@@ -69,7 +64,7 @@ const App: React.FC = () => {
       psychTestReports: {},
       talkRecords: [],
       analysisReports: {},
-      systemConfig: defaultEnvConfig
+      systemConfig: initialConfig
     };
   });
 
