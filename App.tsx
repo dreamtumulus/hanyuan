@@ -14,12 +14,10 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v11';
+const STORAGE_KEY = 'jingxin_guardian_data_v13';
 
 const SYSTEM_FACTORY_CONFIG: SystemConfig = {
-  openRouterKey: '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', 
-  preferredModel: 'google/gemini-3-flash-preview',
-  apiBaseUrl: 'https://openrouter.ai/api/v1'
+  preferredModel: 'gemini-3-flash-preview',
 };
 
 const App: React.FC = () => {
@@ -30,9 +28,7 @@ const App: React.FC = () => {
     if (saved) {
       const parsed = JSON.parse(saved);
       const mergedConfig: SystemConfig = {
-        openRouterKey: parsed.systemConfig?.openRouterKey || initialConfig.openRouterKey,
         preferredModel: parsed.systemConfig?.preferredModel || initialConfig.preferredModel,
-        apiBaseUrl: parsed.systemConfig?.apiBaseUrl || initialConfig.apiBaseUrl,
       };
       return { ...parsed, systemConfig: mergedConfig };
     }
