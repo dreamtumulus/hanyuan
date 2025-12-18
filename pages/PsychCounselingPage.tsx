@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { PersonalInfo, ExamReport, PsychTestReport, SystemConfig } from '../types';
-import { GoogleGenAI } from '@google/genai';
+import { geminiService } from '../geminiService';
 
 interface PsychCounselingPageProps {
   officerInfo?: PersonalInfo;
@@ -24,23 +24,15 @@ const PsychCounselingPage: React.FC<PsychCounselingPageProps> = ({ officerInfo, 
     if (messages.length > 0) return;
     
     setIsTyping(true);
-    // Initialize GoogleGenAI with the provided API KEY from environment
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const latestPsych = psychReports[psychReports.length - 1];
-    
     const context = `用户信息: ${JSON.stringify(officerInfo)}\n最新体检: ${JSON.stringify(exams[exams.length - 1])}\n最新心理测评: ${latestPsych?.content || '暂无'}`;
-    
     const prompt = `你是警察心理疏导员。背景信息：${context}\n\n请根据用户的情况进行开场白。遵循去病理化、战术性建议的原则。`;
     
     try {
-      // Use ai.models.generateContent with named parameters and property access for text output
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-      setMessages([{ role: 'model', text: response.text || '你好，很高兴能为你提供心理疏导。今天感觉怎么样？' }]);
+      const response = await geminiService.callAI(prompt, systemConfig, "你是一名专业的警务心理辅导员。");
+      setMessages([{ role: 'model', text: response || '你好，很高兴能为你提供心理疏导。今天感觉怎么样？' }]);
     } catch (e) {
-      setMessages([{ role: 'model', text: '你好，很高兴能为你提供心理疏导。今天感觉怎么样？' }]);
+      setMessages([{ role: 'model', text: '你好，我是您的心理疏导助手。最近工作压力大吗？有什么想聊聊的？' }]);
     } finally {
       setIsTyping(false);
     }
@@ -59,16 +51,12 @@ const PsychCounselingPage: React.FC<PsychCounselingPageProps> = ({ officerInfo, 
     setMessages(newMsgs);
     setIsTyping(true);
 
-    // Create a new instance right before making an API call to ensure it always uses the most up-to-date API key
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: newMsgs.map(m => ({ parts: [{ text: m.text }], role: m.role === 'user' ? 'user' : 'model' })),
-      });
-      setMessages([...newMsgs, { role: 'model', text: response.text || '' }]);
+      const response = await geminiService.callAI(userMsg, systemConfig, "继续进行心理疏导对话。");
+      setMessages([...newMsgs, { role: 'model', text: response || '' }]);
     } catch (err) {
       console.error(err);
+      setMessages([...newMsgs, { role: 'model', text: '抱歉，系统暂时无法响应，请稍后再试。' }]);
     } finally {
       setIsTyping(false);
     }

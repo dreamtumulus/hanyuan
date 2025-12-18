@@ -14,15 +14,16 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v7';
+const STORAGE_KEY = 'jingxin_guardian_data_v8';
 
 /**
  * 系统预设的“工厂配置”
- * 当管理员未在后台配置时，所有用户默认使用此套配置
+ * 注意：由于 OpenRouter Key 容易失效，默认配置改为空，
+ * 这样系统会自动回退到使用 Vercel 环境变量中配置的 process.env.API_KEY (Native Gemini)
  */
 const SYSTEM_FACTORY_CONFIG: SystemConfig = {
-  openRouterKey: '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',
-  preferredModel: 'google/gemini-3-flash-preview',
+  openRouterKey: '', // 留空以触发 Native Gemini 回退
+  preferredModel: 'gemini-3-flash-preview',
   apiBaseUrl: 'https://openrouter.ai/api/v1'
 };
 
@@ -30,7 +31,7 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     
-    // 合并逻辑：环境变量 > 系统默认
+    // 基础环境配置
     const defaultEnvConfig: SystemConfig = {
       openRouterKey: (process.env as any).OPENROUTER_API_KEY || SYSTEM_FACTORY_CONFIG.openRouterKey,
       preferredModel: (process.env as any).PREFERRED_MODEL || SYSTEM_FACTORY_CONFIG.preferredModel,
@@ -39,22 +40,15 @@ const App: React.FC = () => {
 
     if (saved) {
       const parsed = JSON.parse(saved);
-      // 深度合并配置：如果用户保存的配置项为空，则回退到 defaultEnvConfig
+      // 合并配置：如果用户自定义了 Key 则使用，否则使用环境默认值
       const mergedConfig: SystemConfig = {
-        openRouterKey: (parsed.systemConfig?.openRouterKey && parsed.systemConfig.openRouterKey.trim() !== "") 
-          ? parsed.systemConfig.openRouterKey 
-          : defaultEnvConfig.openRouterKey,
-        preferredModel: (parsed.systemConfig?.preferredModel && parsed.systemConfig.preferredModel.trim() !== "")
-          ? parsed.systemConfig.preferredModel
-          : defaultEnvConfig.preferredModel,
-        apiBaseUrl: (parsed.systemConfig?.apiBaseUrl && parsed.systemConfig.apiBaseUrl.trim() !== "")
-          ? parsed.systemConfig.apiBaseUrl
-          : defaultEnvConfig.apiBaseUrl,
+        openRouterKey: parsed.systemConfig?.openRouterKey ?? defaultEnvConfig.openRouterKey,
+        preferredModel: parsed.systemConfig?.preferredModel || defaultEnvConfig.preferredModel,
+        apiBaseUrl: parsed.systemConfig?.apiBaseUrl || defaultEnvConfig.apiBaseUrl,
       };
       return { ...parsed, systemConfig: mergedConfig };
     }
 
-    // 初始默认账号
     const defaultAccounts: Record<string, UserAccount> = {
       'admin': { username: 'admin', password: 'xiaoyuan', role: UserRole.ADMIN, name: '管理员' },
       'xiaoyuantest': { username: 'xiaoyuantest', password: '123456', role: 'MULTIPLE', name: '演示账号' },
@@ -135,38 +129,21 @@ const App: React.FC = () => {
     setState(prev => {
       const updatedPersonalInfo = { ...prev.personalInfo };
       const updatedAccounts = { ...prev.accounts };
-      
       if (!updatedPersonalInfo[record.policeId]) {
         updatedPersonalInfo[record.policeId] = {
-          name: record.officerName,
-          policeId: record.policeId,
-          department: '基层科所队',
-          position: '待定',
-          gender: '男', age: '', idCard: '', hometown: '', address: '', phone: '', email: '', family: []
+          name: record.officerName, policeId: record.policeId, department: '基层科所队',
+          position: '待定', gender: '男', age: '', idCard: '', hometown: '', address: '', phone: '', email: '', family: []
         };
-        
         updatedAccounts[record.policeId] = {
-          username: record.policeId,
-          password: password || '123456',
-          role: UserRole.OFFICER,
-          name: record.officerName
+          username: record.policeId, password: password || '123456', role: UserRole.OFFICER, name: record.officerName
         };
       }
-      
-      return {
-        ...prev,
-        personalInfo: updatedPersonalInfo,
-        accounts: updatedAccounts,
-        talkRecords: [record, ...prev.talkRecords]
-      };
+      return { ...prev, personalInfo: updatedPersonalInfo, accounts: updatedAccounts, talkRecords: [record, ...prev.talkRecords] };
     });
   };
 
   const saveAnalysisReport = (report: AIAnalysisReport) => {
-    setState(prev => ({
-      ...prev,
-      analysisReports: { ...prev.analysisReports, [report.policeId]: report }
-    }));
+    setState(prev => ({ ...prev, analysisReports: { ...prev.analysisReports, [report.policeId]: report } }));
   };
 
   const logout = () => {
@@ -206,12 +183,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       {state.currentUser && currentPath !== 'login' && (
-        <Header 
-          user={state.currentUser} 
-          onBack={() => window.history.back()} 
-          onLogout={logout} 
-          showBack={currentPath !== 'identity-select'}
-        />
+        <Header user={state.currentUser} onBack={() => window.history.back()} onLogout={logout} showBack={currentPath !== 'identity-select'} />
       )}
       <div className="flex flex-1 overflow-hidden relative">
         {showSidebar && <Sidebar role={state.currentUser.role} currentPath={currentPath} onNavigate={navigate} />}
