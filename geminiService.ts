@@ -4,14 +4,15 @@ import { REPORT_GENERATION_PROMPT } from "./constants";
 
 export const geminiService = {
   /**
-   * 核心 AI 调用逻辑：仅依赖 OpenRouter 链路
-   * 不再读取 process.env，所有参数通过 config 传入
+   * 核心 AI 调用逻辑
+   * 严格遵循 OpenRouter 浏览器端调用规范
    */
   async callAI(prompt: string, config: SystemConfig, systemInstruction?: string) {
+    // 1. 获取并极端净化 Key
     const key = (config.openRouterKey || "").trim();
     
-    if (!key) {
-      return "[系统提示] 未配置 API Key。请联系管理员在“系统设置”中输入有效的 OpenRouter Key。";
+    if (!key || key.startsWith("sk-or-v1-d0d8")) { // 过滤掉已知失效的占位符
+      return "[系统提示] 当前使用的 API Key 可能已失效或未配置。请点击左侧导航栏底部的“系统设置”更新您的 OpenRouter Key。";
     }
 
     try {
@@ -19,12 +20,17 @@ export const geminiService = {
         .trim()
         .replace(/\/$/, "");
 
+      // OpenRouter 在浏览器环境极其看重这两个 Header
+      const referer = window.location.origin || "https://jingxin-guardian.vercel.app";
+      const title = "警心卫士分析系统";
+
       const response = await fetch(`${sanitizedBaseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${key}`,
           "Content-Type": "application/json",
-          "X-Title": "JingXin Guardian"
+          "HTTP-Referer": referer, 
+          "X-Title": title
         },
         body: JSON.stringify({
           model: config.preferredModel || "google/gemini-2.0-flash-001",
@@ -32,7 +38,8 @@ export const geminiService = {
             ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
             { role: "user", content: prompt }
           ],
-          temperature: 0.7
+          temperature: 0.7,
+          top_p: 0.9
         })
       });
 
@@ -41,22 +48,23 @@ export const geminiService = {
       if (response.ok) {
         return data.choices?.[0]?.message?.content || "AI 响应内容为空";
       } else {
-        console.error("OpenRouter API 错误:", data);
-        const errorMsg = data.error?.message || `HTTP ${response.status}`;
+        console.error("OpenRouter 返回错误详情:", data);
+        const errorDetail = data.error?.message || JSON.stringify(data.error);
         
-        if (errorMsg.includes("User not found") || errorMsg.includes("invalid_api_key")) {
-          return `[系统报警] API Key 已失效或用户不存在。请管理员登录后台更换有效的 OpenRouter Key。 (错误详情: ${errorMsg})`;
+        // 针对性错误引导
+        if (errorDetail.includes("User not found") || errorDetail.includes("invalid_api_key")) {
+          return `[鉴权失败] OpenRouter 无法识别此 Key。请检查：\n1. Key 是否被删除或禁用\n2. 是否有余额\n3. 在“系统设置”中重新粘贴 Key 并保存。`;
         }
         
-        if (errorMsg.includes("Insufficient balance") || errorMsg.includes("credits")) {
-          return `[系统报警] OpenRouter 账户余额不足，请及时充值。`;
+        if (errorDetail.includes("Insufficient balance") || errorDetail.includes("credits")) {
+          return `[余额不足] 您的 OpenRouter 账户已欠费。请前往 openrouter.ai 充值。`;
         }
 
-        return `[AI 调用失败] ${errorMsg}`;
+        return `[接口返回报错] ${errorDetail}`;
       }
     } catch (err: any) {
-      console.error("网络请求异常:", err);
-      return `[网络异常] 无法连接到 AI 服务，请检查网络状况或 API 基础路径配置。`;
+      console.error("底层网络异常:", err);
+      return `[网络连接异常] 无法触达 AI 服务器。可能原因：\n1. 您当前的防火墙/VPN 拦截了请求\n2. API 基础路径填写错误。`;
     }
   },
 

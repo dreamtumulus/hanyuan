@@ -14,14 +14,10 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v9';
+const STORAGE_KEY = 'jingxin_guardian_data_v10';
 
-/**
- * 【核心配置】系统自设的 OpenRouter Key
- * 移除 process.env 依赖，直接从这里读取默认值
- */
 const SYSTEM_FACTORY_CONFIG: SystemConfig = {
-  openRouterKey: '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',
+  openRouterKey: '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', // 留空，强制由管理员在 UI 中配置
   preferredModel: 'google/gemini-3-flash-preview',
   apiBaseUrl: 'https://openrouter.ai/api/v1'
 };
@@ -29,13 +25,10 @@ const SYSTEM_FACTORY_CONFIG: SystemConfig = {
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    
-    // 初始化配置：不再读取环境变量，直接使用工厂设置
     const initialConfig = { ...SYSTEM_FACTORY_CONFIG };
 
     if (saved) {
       const parsed = JSON.parse(saved);
-      // 如果用户在“系统设置”里改过，则优先使用用户保存的配置
       const mergedConfig: SystemConfig = {
         openRouterKey: parsed.systemConfig?.openRouterKey || initialConfig.openRouterKey,
         preferredModel: parsed.systemConfig?.preferredModel || initialConfig.preferredModel,
