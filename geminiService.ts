@@ -5,16 +5,12 @@ import { REPORT_GENERATION_PROMPT } from "./constants";
 
 export const geminiService = {
   async callAI(prompt: string, config: SystemConfig, systemInstruction?: string) {
-    // 优先检查是否配置了 OpenRouter (通过 API Key 判断)
-    if (config.openRouterKey && config.openRouterKey.trim() !== "") {
+    // 强制清理配置中的非法字符
+    const sanitizedKey = (config.openRouterKey || "").replace(/[^\x00-\x7F]/g, "").trim();
+    
+    // 如果配置了 OpenRouter Key
+    if (sanitizedKey !== "") {
       try {
-        /**
-         * 关键修复逻辑：
-         * 浏览器 fetch API 的 Headers 对象仅支持 ISO-8859-1 字符集。
-         * 如果 API Key 中包含中文空格（U+3000）或用户意外输入的非 ASCII 字符，fetch 会直接报错。
-         * 我们在此处强制过滤掉所有非 ASCII 字符 (range 0-127)。
-         */
-        const sanitizedKey = config.openRouterKey.replace(/[^\x00-\x7F]/g, "").trim();
         const sanitizedOrigin = window.location.origin.replace(/[^\x00-\x7F]/g, "");
         const sanitizedBaseUrl = (config.apiBaseUrl || "https://openrouter.ai/api/v1")
           .trim()
@@ -35,39 +31,23 @@ export const geminiService = {
               ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
               { role: "user", content: prompt }
             ],
-            temperature: 0.7,
-            top_p: 0.9
+            temperature: 0.7
           })
         });
 
         const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error?.message || `HTTP 错误: ${response.status}`);
-        }
-
-        if (data.error) {
-          console.error("OpenRouter 业务错误:", data.error);
-          throw new Error(data.error.message || "OpenRouter 接口返回错误");
-        }
-        
-        return data.choices?.[0]?.message?.content || "AI 响应内容为空，请检查模型是否可用";
+        if (!response.ok) throw new Error(data.error?.message || `HTTP ${response.status}`);
+        return data.choices?.[0]?.message?.content || "AI 响应内容为空";
       } catch (err: any) {
         console.warn("OpenRouter 链路异常:", err.message);
-        
-        // 捕获 Headers 导致的特定错误并给出极简的修复建议
-        if (err.message.includes('ISO-8859-1') || err.message.includes('headers') || err.message.includes('fetch')) {
-          return `[配置错误] 您的 API Key 或路径包含非法字符（如全角空格）。请在“系统设置”中删除并重新手动输入 API Key。`;
-        }
-        
-        return `[系统警告] 研判请求失败: ${err.message}。建议检查 API Key 余额或网络连接。`;
+        return `[系统警告] 链路访问受限: ${err.message}。请联系管理员在后台更新全局 API Key。`;
       }
     }
 
     // 回退方案：使用原生的 Gemini SDK (需要 Vercel 注入 process.env.API_KEY)
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const fallbackModel = config.preferredModel.includes('/') ? 'gemini-3-flash-preview' : config.preferredModel;
+      const fallbackModel = (config.preferredModel && !config.preferredModel.includes('/')) ? config.preferredModel : 'gemini-3-flash-preview';
       
       const response = await ai.models.generateContent({
         model: fallbackModel,
@@ -77,7 +57,7 @@ export const geminiService = {
       return response.text || "Gemini SDK 响应内容为空";
     } catch (err: any) {
       console.error("SDK Fallback Error:", err);
-      return `[核心链路故障] 无法连接到 AI 服务，请在系统设置中配置有效的 OpenRouter API Key。`;
+      return `[核心链路故障] 无法连接到 AI 服务。管理员请在系统设置中配置全局 OpenRouter API Key 以恢复服务。`;
     }
   },
 
@@ -95,10 +75,11 @@ export const geminiService = {
   async generateComprehensiveReport(data: { officer: any, exams: any[], psychs: any[], talks: any[] }, config: SystemConfig) {
     const context = `
     民警姓名: ${data.officer?.name}
-    部门职位: ${data.officer?.dept || data.officer?.department} / ${data.officer?.position}
+    警号: ${data.officer?.policeId}
+    部门: ${data.officer?.department}
     体检摘要: ${JSON.stringify(data.exams.map(e => e.analysis))}
-    心理摘要: ${JSON.stringify(data.psychs.map(p => p.content))}
-    谈话摘要: ${JSON.stringify(data.talks)}
+    心理对话摘要: ${JSON.stringify(data.psychs.map(p => p.content))}
+    历史谈话记录: ${JSON.stringify(data.talks)}
     `;
     return this.callAI(context, config, REPORT_GENERATION_PROMPT);
   }

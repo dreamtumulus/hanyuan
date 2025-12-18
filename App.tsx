@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserRole, AppState, PersonalInfo, TalkRecord, ExamReport, PsychTestReport, AIAnalysisReport, SystemConfig } from './types';
+import { UserRole, AppState, PersonalInfo, TalkRecord, ExamReport, PsychTestReport, AIAnalysisReport, SystemConfig, UserAccount } from './types';
 import Login from './pages/Login';
 import IdentitySelect from './pages/IdentitySelect';
 import Sidebar from './components/Sidebar';
@@ -14,13 +14,32 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v4';
+const STORAGE_KEY = 'jingxin_guardian_data_v6';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {
+    const initialConfig: SystemConfig = {
+      openRouterKey: (process.env as any).OPENROUTER_API_KEY || '',
+      preferredModel: (process.env as any).PREFERRED_MODEL || 'google/gemini-2.0-flash-001',
+      apiBaseUrl: (process.env as any).API_BASE_URL || 'https://openrouter.ai/api/v1'
+    };
+
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...parsed, systemConfig: { ...initialConfig, ...parsed.systemConfig } };
+    }
+
+    // 默认初始账号
+    const defaultAccounts: Record<string, UserAccount> = {
+      'admin': { username: 'admin', password: 'xiaoyuan', role: UserRole.ADMIN, name: '管理员' },
+      'xiaoyuantest': { username: 'xiaoyuantest', password: '123456', role: 'MULTIPLE', name: '演示账号' },
+      'TEST001': { username: 'TEST001', password: 'password123', role: UserRole.OFFICER, name: '演示民警' }
+    };
+
+    return {
       currentUser: null,
+      accounts: defaultAccounts,
       personalInfo: {
         'TEST001': { 
           name: '演示民警', policeId: 'TEST001', department: '演示大队', position: '二级警员',
@@ -32,17 +51,11 @@ const App: React.FC = () => {
       psychTestReports: {},
       talkRecords: [],
       analysisReports: {},
-      systemConfig: {
-        openRouterKey: '',
-        preferredModel: 'google/gemini-2.0-flash-001',
-        apiBaseUrl: 'https://openrouter.ai/api/v1'
-      }
+      systemConfig: initialConfig
     };
   });
 
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.hash.replace('#', '') || 'login');
-  
-  // 对于管理人员，用于跟踪当前正在查看/编辑哪位民警的档案
   const [activeOfficerId, setActiveOfficerId] = useState<string>('TEST001');
 
   useEffect(() => {
@@ -51,7 +64,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleHashChange = () => {
-      setCurrentPath(window.location.hash.replace('#', '') || 'login');
+      const path = window.location.hash.replace('#', '') || 'login';
+      setCurrentPath(path);
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -61,18 +75,26 @@ const App: React.FC = () => {
     window.location.hash = path;
   };
 
-  const handleLogin = (username: string, role: UserRole) => {
-    setState(prev => ({ ...prev, currentUser: { username, role } }));
-    if (role === UserRole.ADMIN) {
-      navigate('admin-settings');
-    } else {
-      navigate('identity-select');
+  const handleLogin = (username: string, password: string): boolean => {
+    const account = state.accounts[username];
+    if (account && account.password === password) {
+      if (account.role === 'MULTIPLE') {
+        setState(prev => ({ ...prev, currentUser: { username, role: UserRole.OFFICER, actualId: username } })); 
+        navigate('identity-select');
+      } else {
+        setState(prev => ({ ...prev, currentUser: { username, role: account.role as UserRole, actualId: username } }));
+        if (account.role === UserRole.ADMIN) navigate('admin-settings');
+        else if (account.role === UserRole.LEADER) navigate('dashboard');
+        else if (account.role === UserRole.COMMANDER) navigate('talk-entry');
+        else navigate('personal-info');
+      }
+      return true;
     }
+    return false;
   };
 
   const setRole = (role: UserRole) => {
     setState(prev => ({ ...prev, currentUser: { ...prev.currentUser!, role } }));
-    // 默认跳转逻辑
     if (role === UserRole.LEADER) navigate('dashboard');
     else if (role === UserRole.COMMANDER) navigate('talk-entry');
     else navigate('personal-info');
@@ -85,15 +107,17 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleAddTalkRecord = (record: TalkRecord) => {
+  const handleAddTalkRecord = (record: TalkRecord, password?: string) => {
     setState(prev => {
-      const newState = { ...prev, talkRecords: [...prev.talkRecords, record] };
-      // 关键逻辑：如果该警员在人员库中不存在，则自动创建一个基础档案以便领导研判
-      if (!prev.personalInfo[record.policeId]) {
-        newState.personalInfo[record.policeId] = {
+      const updatedPersonalInfo = { ...prev.personalInfo };
+      const updatedAccounts = { ...prev.accounts };
+      
+      // 如果该人员不在库中，自动新建基础档案和账号
+      if (!updatedPersonalInfo[record.policeId]) {
+        updatedPersonalInfo[record.policeId] = {
           name: record.officerName,
           policeId: record.policeId,
-          department: '待定',
+          department: '基层科所队',
           position: '待定',
           gender: '男',
           age: '',
@@ -104,8 +128,22 @@ const App: React.FC = () => {
           email: '',
           family: []
         };
+        
+        // 自动创建民警账号，默认密码为 123456 或队长指定的密码
+        updatedAccounts[record.policeId] = {
+          username: record.policeId,
+          password: password || '123456',
+          role: UserRole.OFFICER,
+          name: record.officerName
+        };
       }
-      return newState;
+      
+      return {
+        ...prev,
+        personalInfo: updatedPersonalInfo,
+        accounts: updatedAccounts,
+        talkRecords: [record, ...prev.talkRecords]
+      };
     });
   };
 
@@ -116,10 +154,6 @@ const App: React.FC = () => {
     }));
   };
 
-  const updateSystemConfig = (config: SystemConfig) => {
-    setState(prev => ({ ...prev, systemConfig: config }));
-  };
-
   const logout = () => {
     setState(prev => ({ ...prev, currentUser: null }));
     navigate('login');
@@ -128,49 +162,23 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (!state.currentUser) return <Login onLogin={handleLogin} />;
     if (currentPath === 'identity-select') return <IdentitySelect onSelect={setRole} />;
-    if (currentPath === 'admin-settings') return <AdminSettings config={state.systemConfig} onSave={updateSystemConfig} />;
+    if (currentPath === 'admin-settings') return <AdminSettings config={state.systemConfig} onSave={(c) => setState(prev => ({...prev, systemConfig: c}))} />;
 
     // 确定当前上下文 ID
-    const effectiveId = (state.currentUser.role === UserRole.OFFICER) ? 'TEST001' : activeOfficerId;
+    // 如果是民警登录，只能看自己的 actualId；如果是领导/队长，可以切换 activeOfficerId
+    const effectiveId = (state.currentUser.role === UserRole.OFFICER) ? (state.currentUser.actualId || 'TEST001') : activeOfficerId;
 
     switch (currentPath) {
       case 'personal-info':
         return <PersonalInfoPage info={state.personalInfo[effectiveId]} onSave={updatePersonalInfo} />;
       case 'exam-reports':
-        return (
-          <ExamReportPage 
-            reports={state.examReports[effectiveId] || []} 
-            systemConfig={state.systemConfig}
-            onAdd={(r) => setState(prev => ({...prev, examReports: {...prev.examReports, [effectiveId]: [...(prev.examReports[effectiveId] || []), r]}}))} 
-            onDelete={(id) => setState(prev => ({...prev, examReports: {...prev.examReports, [effectiveId]: prev.examReports[effectiveId].filter(r => r.id !== id)}}))}
-          />
-        );
+        return <ExamReportPage reports={state.examReports[effectiveId] || []} systemConfig={state.systemConfig} onAdd={(r) => setState(prev => ({...prev, examReports: {...prev.examReports, [effectiveId]: [...(prev.examReports[effectiveId] || []), r]}}))} onDelete={(id) => setState(prev => ({...prev, examReports: {...prev.examReports, [effectiveId]: prev.examReports[effectiveId].filter(r => r.id !== id)}}))} />;
       case 'psych-test':
-        return (
-          <PsychTestPage 
-            reports={state.psychTestReports[effectiveId] || []} 
-            onAddReport={(r) => setState(prev => ({...prev, psychTestReports: {...prev.psychTestReports, [effectiveId]: [...(prev.psychTestReports[effectiveId] || []), r]}}))}
-            officerInfo={state.personalInfo[effectiveId]}
-            systemConfig={state.systemConfig}
-          />
-        );
+        return <PsychTestPage reports={state.psychTestReports[effectiveId] || []} onAddReport={(r) => setState(prev => ({...prev, psychTestReports: {...prev.psychTestReports, [effectiveId]: [...(prev.psychTestReports[effectiveId] || []), r]}}))} officerInfo={state.personalInfo[effectiveId]} systemConfig={state.systemConfig} />;
       case 'psych-counseling':
-        return (
-          <PsychCounselingPage 
-            officerInfo={state.personalInfo[effectiveId]}
-            exams={state.examReports[effectiveId] || []}
-            psychReports={state.psychTestReports[effectiveId] || []}
-            systemConfig={state.systemConfig}
-          />
-        );
+        return <PsychCounselingPage officerInfo={state.personalInfo[effectiveId]} exams={state.examReports[effectiveId] || []} psychReports={state.psychTestReports[effectiveId] || []} systemConfig={state.systemConfig} />;
       case 'talk-entry':
-        return (
-          <TalkEntryPage 
-            records={state.talkRecords} 
-            onAdd={handleAddTalkRecord} 
-            onDelete={(id) => setState(prev => ({...prev, talkRecords: prev.talkRecords.filter(r => r.id !== id)}))}
-          />
-        );
+        return <TalkEntryPage records={state.talkRecords} onAdd={handleAddTalkRecord} onDelete={(id) => setState(prev => ({...prev, talkRecords: prev.talkRecords.filter(r => r.id !== id)}))} />;
       case 'dashboard':
         return <DashboardPage state={state} onNavigate={(path) => navigate(path)} />;
       case 'analysis-report':
@@ -180,16 +188,16 @@ const App: React.FC = () => {
     }
   };
 
-  const showSidebar = state.currentUser && currentPath !== 'identity-select';
+  const showSidebar = state.currentUser && currentPath !== 'identity-select' && currentPath !== 'login';
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {state.currentUser && (
+      {state.currentUser && currentPath !== 'login' && (
         <Header 
           user={state.currentUser} 
           onBack={() => window.history.back()} 
           onLogout={logout} 
-          showBack={currentPath !== 'identity-select' && currentPath !== 'login'}
+          showBack={currentPath !== 'identity-select'}
         />
       )}
       <div className="flex flex-1 overflow-hidden relative">

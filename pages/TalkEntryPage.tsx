@@ -4,12 +4,13 @@ import { TalkRecord } from '../types';
 
 interface TalkEntryPageProps {
   records: TalkRecord[];
-  onAdd: (record: TalkRecord) => void;
+  onAdd: (record: TalkRecord, password?: string) => void;
   onDelete: (id: string) => void;
 }
 
 const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete }) => {
   const [showModal, setShowModal] = useState(false);
+  const [officerPassword, setOfficerPassword] = useState('123456');
   const [formData, setFormData] = useState<Partial<TalkRecord>>({
     officerName: '', policeId: '', interviewer: '', participants: '',
     date: new Date().toISOString().split('T')[0], location: '', 
@@ -28,9 +29,9 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd({ ...formData, id: Date.now().toString() } as TalkRecord);
+    onAdd({ ...formData, id: Date.now().toString() } as TalkRecord, officerPassword);
     setShowModal(false);
-    setFormData({ ...formData, officerName: '', policeId: '' }); // 重置核心字段
+    setFormData({ ...formData, officerName: '', policeId: '' });
   };
 
   const renderToggleField = (label: string, field: keyof TalkRecord, detailField: keyof TalkRecord) => (
@@ -69,7 +70,7 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
             谈心谈话记录录入
             <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black">COMMANDER ROLE</span>
           </h2>
-          <p className="text-slate-500 text-sm mt-1">记录警员思想动态，数据将实时同步至政工研判终端</p>
+          <p className="text-slate-500 text-sm mt-1">记录警员思想动态，新录入警员将自动生成登录账号</p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
@@ -141,21 +142,26 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
             </div>
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10">
               <section className="space-y-4">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">基础信息检索</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">基础信息与账号设置</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">被谈话人姓名</label>
                     <input required className="w-full px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all" value={formData.officerName} onChange={e => setFormData({...formData, officerName: e.target.value})} />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">警号 (系统唯一主键)</label>
+                    <label className="text-xs font-bold text-slate-700">警号 (登录账号)</label>
                     <input required className="w-full px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all font-mono" value={formData.policeId} onChange={e => setFormData({...formData, policeId: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">初始登录密码</label>
+                    <input required className="w-full px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all" type="text" value={officerPassword} onChange={e => setOfficerPassword(e.target.value)} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">谈话负责人</label>
                     <input required className="w-full px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all" value={formData.interviewer} onChange={e => setFormData({...formData, interviewer: e.target.value})} />
                   </div>
                 </div>
+                <p className="text-[10px] text-amber-600 font-bold">提示：若警号为新用户，保存后将自动开通民警端访问权限。</p>
               </section>
 
               <section className="space-y-4">
@@ -194,7 +200,7 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
             <div className="p-6 border-t bg-slate-50 flex justify-end gap-4">
               <button onClick={() => setShowModal(false)} className="px-8 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-all">取消</button>
               <button onClick={handleSubmit} className="px-12 py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-xl hover:bg-blue-900 active:scale-95 transition-all">
-                存入档案并提交研判
+                开通账号并提交研判
               </button>
             </div>
           </div>

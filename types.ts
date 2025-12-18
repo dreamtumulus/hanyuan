@@ -6,6 +6,13 @@ export enum UserRole {
   ADMIN = 'ADMIN' // 系统管理员
 }
 
+export interface UserAccount {
+  username: string; // 对应警号
+  password: string;
+  role: UserRole | 'MULTIPLE'; // MULTIPLE 表示演示账号，可进入身份选择
+  name: string;
+}
+
 export interface SystemConfig {
   openRouterKey: string;
   preferredModel: string;
@@ -99,11 +106,13 @@ export interface AppState {
   currentUser: {
     username: string;
     role: UserRole;
+    actualId?: string; // 实际登录的警号
   } | null;
+  accounts: Record<string, UserAccount>; // 账号数据库
   personalInfo: Record<string, PersonalInfo>;
   examReports: Record<string, ExamReport[]>;
   psychTestReports: Record<string, PsychTestReport[]>;
   talkRecords: TalkRecord[];
-  analysisReports: Record<string, AIAnalysisReport>; // Persistent storage for reports
+  analysisReports: Record<string, AIAnalysisReport>;
   systemConfig: SystemConfig;
 }
