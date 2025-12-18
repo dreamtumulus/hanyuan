@@ -30,6 +30,7 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
     e.preventDefault();
     onAdd({ ...formData, id: Date.now().toString() } as TalkRecord);
     setShowModal(false);
+    setFormData({ ...formData, officerName: '', policeId: '' }); // 重置核心字段
   };
 
   const renderToggleField = (label: string, field: keyof TalkRecord, detailField: keyof TalkRecord) => (
@@ -64,12 +65,15 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">谈心谈话记录录入</h2>
-          <p className="text-slate-500 text-sm">记录与下属警员的谈话内容，作为思想研判的重要依据</p>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+            谈心谈话记录录入
+            <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-black">COMMANDER ROLE</span>
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">记录警员思想动态，数据将实时同步至政工研判终端</p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-blue-900/10 hover:bg-blue-800"
+          className="bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-blue-900/10 hover:bg-blue-800 active:scale-95 transition-all"
         >
           + 新增谈话
         </button>
@@ -77,37 +81,44 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-xs tracking-wider">
+          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px] tracking-widest">
             <tr>
-              <th className="px-6 py-3 text-left">警员姓名</th>
-              <th className="px-6 py-3 text-left">谈话时间</th>
-              <th className="px-6 py-3 text-left">谈话地点</th>
-              <th className="px-6 py-3 text-left">负责人</th>
-              <th className="px-6 py-3 text-left">风险项</th>
-              <th className="px-6 py-3 text-right">操作</th>
+              <th className="px-6 py-4 text-left">警员姓名/警号</th>
+              <th className="px-6 py-4 text-left">谈话日期</th>
+              <th className="px-6 py-4 text-left">负责人</th>
+              <th className="px-6 py-4 text-left">风险评估状态</th>
+              <th className="px-6 py-4 text-right">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {records.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">暂无录入记录</td>
+                <td colSpan={5} className="px-6 py-20 text-center">
+                  <div className="text-slate-200 text-5xl mb-4">✍️</div>
+                  <p className="text-slate-400 font-medium italic">暂无录入记录，点击“新增谈话”开始数据采集</p>
+                </td>
               </tr>
             ) : records.map(r => (
               <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 font-bold text-slate-800">{r.officerName}</td>
-                <td className="px-6 py-4">{r.date}</td>
-                <td className="px-6 py-4">{r.location}</td>
-                <td className="px-6 py-4">{r.interviewer}</td>
+                <td className="px-6 py-4">
+                  <div className="font-bold text-slate-800">{r.officerName}</div>
+                  <div className="text-[10px] text-slate-400 font-mono">{r.policeId}</div>
+                </td>
+                <td className="px-6 py-4 text-slate-500">{r.date}</td>
+                <td className="px-6 py-4 font-medium">{r.interviewer}</td>
                 <td className="px-6 py-4">
                   {[r.hasFamilyConflict, r.hasMajorChange, r.hasDebt, r.hasAlcoholIssue, r.hasRelationshipIssue, r.hasComplexSocial, r.isUnderInvestigation, r.hasMentalIssue].filter(Boolean).length > 0 ? (
-                    <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[10px] font-bold">高风险</span>
+                    <span className="flex items-center gap-1.5 text-red-600 font-black text-[10px]">
+                      <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse"></span>
+                      触发风险项
+                    </span>
                   ) : (
-                    <span className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[10px] font-bold">正常</span>
+                    <span className="text-green-600 font-bold text-[10px]">情况平稳</span>
                   )}
                 </td>
                 <td className="px-6 py-4 text-right">
-                   <button onClick={() => onDelete(r.id)} className="text-red-500 hover:text-red-700 p-2">
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <button onClick={() => onDelete(r.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                      </svg>
                    </button>
@@ -119,78 +130,72 @@ const TalkEntryPage: React.FC<TalkEntryPageProps> = ({ records, onAdd, onDelete 
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-fadeIn">
-            <div className="bg-[#1e3a8a] p-4 text-white flex items-center justify-between">
-              <h3 className="font-bold">新增谈心谈话记录</h3>
-              <button onClick={() => setShowModal(false)} className="text-white hover:opacity-70">✕</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scaleIn">
+            <div className="bg-[#1e3a8a] p-6 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-xl tracking-tight">新增警员谈心记录</h3>
+                <p className="text-[10px] text-blue-200 font-bold mt-1 uppercase">New Dynamic Observation Entry</p>
+              </div>
+              <button onClick={() => setShowModal(false)} className="bg-white/10 hover:bg-white/20 p-2 rounded-full">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">被谈话人姓名</label>
-                  <input required className="w-full px-3 py-2 border rounded-md" value={formData.officerName} onChange={e => setFormData({...formData, officerName: e.target.value})} />
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10">
+              <section className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">基础信息检索</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">被谈话人姓名</label>
+                    <input required className="w-full px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all" value={formData.officerName} onChange={e => setFormData({...formData, officerName: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">警号 (系统唯一主键)</label>
+                    <input required className="w-full px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all font-mono" value={formData.policeId} onChange={e => setFormData({...formData, policeId: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">谈话负责人</label>
+                    <input required className="w-full px-4 py-2 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all" value={formData.interviewer} onChange={e => setFormData({...formData, interviewer: e.target.value})} />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">警号</label>
-                  <input required className="w-full px-3 py-2 border rounded-md" value={formData.policeId} onChange={e => setFormData({...formData, policeId: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">谈话负责人</label>
-                  <input required className="w-full px-3 py-2 border rounded-md" value={formData.interviewer} onChange={e => setFormData({...formData, interviewer: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">参与人</label>
-                  <input className="w-full px-3 py-2 border rounded-md" value={formData.participants} onChange={e => setFormData({...formData, participants: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">谈话时间</label>
-                  <input type="date" className="w-full px-3 py-2 border rounded-md" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">谈话地点</label>
-                  <input className="w-full px-3 py-2 border rounded-md" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
-                </div>
-              </div>
+              </section>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderToggleField('是否有家庭矛盾', 'hasFamilyConflict', 'familyConflictDetail')}
-                {renderToggleField('是否有重大变故', 'hasMajorChange', 'majorChangeDetail')}
-                {renderToggleField('是否有债务缠身', 'hasDebt', 'debtDetail')}
-                {renderToggleField('是否有酗酒滋事', 'hasAlcoholIssue', 'alcoholDetail')}
-                {renderToggleField('个人情感纠纷', 'hasRelationshipIssue', 'relationshipDetail')}
-                {renderToggleField('对外交往复杂', 'hasComplexSocial', 'complexSocialDetail')}
-                {renderToggleField('接受审讯调查', 'isUnderInvestigation', 'investigationDetail')}
-                {renderToggleField('是否有精神疾病', 'hasMentalIssue', 'mentalIssueDetail')}
-              </div>
+              <section className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">八小时外风险排查</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {renderToggleField('家庭矛盾（分居/离异/争吵）', 'hasFamilyConflict', 'familyConflictDetail')}
+                  {renderToggleField('重大变故（亲属病亡/自然灾害）', 'hasMajorChange', 'majorChangeDetail')}
+                  {renderToggleField('经济压力（高额负债/网贷）', 'hasDebt', 'debtDetail')}
+                  {renderToggleField('不良嗜好（酗酒/赌博/社交复杂）', 'hasAlcoholIssue', 'alcoholDetail')}
+                  {renderToggleField('政治审查/接受组织调查中', 'isUnderInvestigation', 'investigationDetail')}
+                  {renderToggleField('精神萎靡/异常行为表现', 'hasMentalIssue', 'mentalIssueDetail')}
+                </div>
+              </section>
 
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">思想动态</label>
-                  <textarea className="w-full p-3 border rounded-md h-24" value={formData.thoughtDynamic} onChange={e => setFormData({...formData, thoughtDynamic: e.target.value})} />
+              <section className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-2">综合评述</h4>
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">思想动态与现实表现</label>
+                    <textarea className="w-full p-4 border-2 border-slate-100 rounded-2xl h-32 focus:border-blue-500 outline-none transition-all" value={formData.thoughtDynamic} onChange={e => setFormData({...formData, thoughtDynamic: e.target.value})} placeholder="详细描述其近期的思想变化、工作态度、社交圈动态..." />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">配枪资格研判建议</label>
+                      <select className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl focus:border-blue-500 outline-none transition-all font-bold" value={formData.canCarryGun} onChange={e => setFormData({...formData, canCarryGun: e.target.value})}>
+                        <option>适宜</option>
+                        <option>建议观察</option>
+                        <option>暂停配枪</option>
+                        <option>取消资格</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">现实表现</label>
-                  <textarea className="w-full p-3 border rounded-md h-24" value={formData.realityPerformance} onChange={e => setFormData({...formData, realityPerformance: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">心理健康状况 (谈话人视角)</label>
-                  <textarea className="w-full p-3 border rounded-md h-24" value={formData.mentalStatus} onChange={e => setFormData({...formData, mentalStatus: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-400 uppercase">适宜配枪情况</label>
-                  <select className="w-full px-3 py-2 border rounded-md" value={formData.canCarryGun} onChange={e => setFormData({...formData, canCarryGun: e.target.value})}>
-                    <option>适宜</option>
-                    <option>建议观察</option>
-                    <option>建议暂停</option>
-                    <option>不适宜</option>
-                  </select>
-                </div>
-              </div>
+              </section>
             </form>
-            <div className="p-4 border-t bg-slate-50 flex justify-end gap-3">
-              <button onClick={() => setShowModal(false)} className="px-6 py-2 border rounded-lg text-slate-600 font-bold">取消</button>
-              <button onClick={handleSubmit} className="px-8 py-2 bg-blue-700 text-white rounded-lg font-bold">保存并提交</button>
+            <div className="p-6 border-t bg-slate-50 flex justify-end gap-4">
+              <button onClick={() => setShowModal(false)} className="px-8 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition-all">取消</button>
+              <button onClick={handleSubmit} className="px-12 py-3 bg-[#1e3a8a] text-white rounded-xl font-black shadow-xl hover:bg-blue-900 active:scale-95 transition-all">
+                存入档案并提交研判
+              </button>
             </div>
           </div>
         </div>

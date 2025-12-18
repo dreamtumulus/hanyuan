@@ -14,27 +14,36 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v3';
+const STORAGE_KEY = 'jingxin_guardian_data_v4';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : {
       currentUser: null,
-      personalInfo: {},
+      personalInfo: {
+        'TEST001': { 
+          name: '演示民警', policeId: 'TEST001', department: '演示大队', position: '二级警员',
+          gender: '男', age: '28', idCard: '110101199501011234', hometown: '北京市',
+          address: '警苑小区', phone: '13800138000', email: 'test@police.cn', family: []
+        }
+      },
       examReports: {},
       psychTestReports: {},
       talkRecords: [],
       analysisReports: {},
       systemConfig: {
         openRouterKey: '',
-        preferredModel: 'gemini-3-pro-preview',
+        preferredModel: 'google/gemini-2.0-flash-001',
         apiBaseUrl: 'https://openrouter.ai/api/v1'
       }
     };
   });
 
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.hash.replace('#', '') || 'login');
+  
+  // 对于管理人员，用于跟踪当前正在查看/编辑哪位民警的档案
+  const [activeOfficerId, setActiveOfficerId] = useState<string>('TEST001');
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -63,7 +72,10 @@ const App: React.FC = () => {
 
   const setRole = (role: UserRole) => {
     setState(prev => ({ ...prev, currentUser: { ...prev.currentUser!, role } }));
-    navigate(role === UserRole.LEADER ? 'dashboard' : 'personal-info');
+    // 默认跳转逻辑
+    if (role === UserRole.LEADER) navigate('dashboard');
+    else if (role === UserRole.COMMANDER) navigate('talk-entry');
+    else navigate('personal-info');
   };
 
   const updatePersonalInfo = (info: PersonalInfo) => {
@@ -71,6 +83,30 @@ const App: React.FC = () => {
       ...prev,
       personalInfo: { ...prev.personalInfo, [info.policeId]: info }
     }));
+  };
+
+  const handleAddTalkRecord = (record: TalkRecord) => {
+    setState(prev => {
+      const newState = { ...prev, talkRecords: [...prev.talkRecords, record] };
+      // 关键逻辑：如果该警员在人员库中不存在，则自动创建一个基础档案以便领导研判
+      if (!prev.personalInfo[record.policeId]) {
+        newState.personalInfo[record.policeId] = {
+          name: record.officerName,
+          policeId: record.policeId,
+          department: '待定',
+          position: '待定',
+          gender: '男',
+          age: '',
+          idCard: '',
+          hometown: '',
+          address: '',
+          phone: '',
+          email: '',
+          family: []
+        };
+      }
+      return newState;
+    });
   };
 
   const saveAnalysisReport = (report: AIAnalysisReport) => {
@@ -91,39 +127,39 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!state.currentUser) return <Login onLogin={handleLogin} />;
-    
     if (currentPath === 'identity-select') return <IdentitySelect onSelect={setRole} />;
     if (currentPath === 'admin-settings') return <AdminSettings config={state.systemConfig} onSave={updateSystemConfig} />;
 
-    const policeId = 'TEST001'; 
+    // 确定当前上下文 ID
+    const effectiveId = (state.currentUser.role === UserRole.OFFICER) ? 'TEST001' : activeOfficerId;
 
     switch (currentPath) {
       case 'personal-info':
-        return <PersonalInfoPage info={state.personalInfo[policeId]} onSave={updatePersonalInfo} />;
+        return <PersonalInfoPage info={state.personalInfo[effectiveId]} onSave={updatePersonalInfo} />;
       case 'exam-reports':
         return (
           <ExamReportPage 
-            reports={state.examReports[policeId] || []} 
+            reports={state.examReports[effectiveId] || []} 
             systemConfig={state.systemConfig}
-            onAdd={(r) => setState(prev => ({...prev, examReports: {...prev.examReports, [policeId]: [...(prev.examReports[policeId] || []), r]}}))} 
-            onDelete={(id) => setState(prev => ({...prev, examReports: {...prev.examReports, [policeId]: prev.examReports[policeId].filter(r => r.id !== id)}}))}
+            onAdd={(r) => setState(prev => ({...prev, examReports: {...prev.examReports, [effectiveId]: [...(prev.examReports[effectiveId] || []), r]}}))} 
+            onDelete={(id) => setState(prev => ({...prev, examReports: {...prev.examReports, [effectiveId]: prev.examReports[effectiveId].filter(r => r.id !== id)}}))}
           />
         );
       case 'psych-test':
         return (
           <PsychTestPage 
-            reports={state.psychTestReports[policeId] || []} 
-            onAddReport={(r) => setState(prev => ({...prev, psychTestReports: {...prev.psychTestReports, [policeId]: [...(prev.psychTestReports[policeId] || []), r]}}))}
-            officerInfo={state.personalInfo[policeId]}
+            reports={state.psychTestReports[effectiveId] || []} 
+            onAddReport={(r) => setState(prev => ({...prev, psychTestReports: {...prev.psychTestReports, [effectiveId]: [...(prev.psychTestReports[effectiveId] || []), r]}}))}
+            officerInfo={state.personalInfo[effectiveId]}
             systemConfig={state.systemConfig}
           />
         );
       case 'psych-counseling':
         return (
           <PsychCounselingPage 
-            officerInfo={state.personalInfo[policeId]}
-            exams={state.examReports[policeId] || []}
-            psychReports={state.psychTestReports[policeId] || []}
+            officerInfo={state.personalInfo[effectiveId]}
+            exams={state.examReports[effectiveId] || []}
+            psychReports={state.psychTestReports[effectiveId] || []}
             systemConfig={state.systemConfig}
           />
         );
@@ -131,16 +167,16 @@ const App: React.FC = () => {
         return (
           <TalkEntryPage 
             records={state.talkRecords} 
-            onAdd={(r) => setState(prev => ({...prev, talkRecords: [...prev.talkRecords, r]}))} 
+            onAdd={handleAddTalkRecord} 
             onDelete={(id) => setState(prev => ({...prev, talkRecords: prev.talkRecords.filter(r => r.id !== id)}))}
           />
         );
       case 'dashboard':
-        return <DashboardPage state={state} onNavigate={navigate} />;
+        return <DashboardPage state={state} onNavigate={(path) => navigate(path)} />;
       case 'analysis-report':
         return <AnalysisReportPage state={state} onSaveReport={saveAnalysisReport} />;
       default:
-        return <PersonalInfoPage info={state.personalInfo[policeId]} onSave={updatePersonalInfo} />;
+        return <PersonalInfoPage info={state.personalInfo[effectiveId]} onSave={updatePersonalInfo} />;
     }
   };
 
