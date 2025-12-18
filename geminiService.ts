@@ -4,29 +4,30 @@ import { SystemConfig } from "./types";
 import { REPORT_GENERATION_PROMPT } from "./constants";
 
 export const geminiService = {
+  /**
+   * 核心 AI 调用逻辑
+   * 优先尝试用户配置的 OpenRouter Key，若失败或未配置且环境有 API_KEY，则回退至原生 Gemini SDK
+   */
   async callAI(prompt: string, config: SystemConfig, systemInstruction?: string) {
-    // 强制清理配置中的非法字符
-    const sanitizedKey = (config.openRouterKey || "").replace(/[^\x00-\x7F]/g, "").trim();
+    const key = (config.openRouterKey || "").trim();
     
-    // 如果配置了 OpenRouter Key
-    if (sanitizedKey !== "") {
+    // 如果配置了 OpenRouter Key，优先走 OpenRouter 链路
+    if (key !== "") {
       try {
-        const sanitizedOrigin = window.location.origin.replace(/[^\x00-\x7F]/g, "");
         const sanitizedBaseUrl = (config.apiBaseUrl || "https://openrouter.ai/api/v1")
           .trim()
-          .replace(/[^\x00-\x7F]/g, "")
           .replace(/\/$/, "");
 
         const response = await fetch(`${sanitizedBaseUrl}/chat/completions`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${sanitizedKey}`,
+            "Authorization": `Bearer ${key}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": sanitizedOrigin,
-            "X-Title": "JingXin Guardian System" 
+            "HTTP-Referer": window.location.origin, // OpenRouter 要求的来源校验
+            "X-Title": "警心卫士系统" 
           },
           body: JSON.stringify({
-            model: config.preferredModel || "google/gemini-2.0-flash-001",
+            model: config.preferredModel || "google/gemini-3-flash-preview",
             messages: [
               ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
               { role: "user", content: prompt }
@@ -36,28 +37,44 @@ export const geminiService = {
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error?.message || `HTTP ${response.status}`);
-        return data.choices?.[0]?.message?.content || "AI 响应内容为空";
+        
+        if (response.ok) {
+          return data.choices?.[0]?.message?.content || "AI 响应内容为空";
+        } else {
+          const errorMsg = data.error?.message || `HTTP ${response.status}`;
+          console.error("OpenRouter API Error:", errorMsg);
+          
+          // 针对性捕获 "User not found"
+          if (errorMsg.includes("User not found") || errorMsg.includes("invalid_api_key")) {
+            return `[鉴权失败] OpenRouter 无法识别该 API Key。请检查 Key 是否正确，或账户余额是否充足。 (报错详情: ${errorMsg})`;
+          }
+          return `[接口返回错误] ${errorMsg}`;
+        }
       } catch (err: any) {
-        console.warn("OpenRouter 链路异常:", err.message);
-        return `[系统警告] 链路访问受限: ${err.message}。请联系管理员在后台更新全局 API Key。`;
+        console.warn("网络请求异常:", err.message);
+        return `[网络异常] 无法连接到 AI 服务器，请检查您的网络环境或 API 地址。`;
       }
     }
 
-    // 回退方案：使用原生的 Gemini SDK (需要 Vercel 注入 process.env.API_KEY)
+    // 回退方案：使用原生 Gemini SDK (由环境 process.env.API_KEY 驱动)
     try {
+      // Fix: Use ai.models.generateContent directly instead of deprecated getGenerativeModel
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const fallbackModel = (config.preferredModel && !config.preferredModel.includes('/')) ? config.preferredModel : 'gemini-3-flash-preview';
+      const modelName = config.preferredModel?.includes('/') ? 'gemini-3-flash-preview' : (config.preferredModel || 'gemini-3-flash-preview');
       
       const response = await ai.models.generateContent({
-        model: fallbackModel,
+        model: modelName,
         contents: prompt,
-        config: systemInstruction ? { systemInstruction, temperature: 0.7 } : { temperature: 0.7 }
+        config: {
+          systemInstruction: systemInstruction 
+        }
       });
-      return response.text || "Gemini SDK 响应内容为空";
+      
+      // Fix: Use .text property instead of text() method
+      return response.text || "原生 SDK 响应内容为空";
     } catch (err: any) {
-      console.error("SDK Fallback Error:", err);
-      return `[核心链路故障] 无法连接到 AI 服务。管理员请在系统设置中配置全局 OpenRouter API Key 以恢复服务。`;
+      console.error("原生 SDK 异常:", err);
+      return `[全链路故障] 当前 API Key 无效且原生服务不可用。请在“系统设置”中配置有效的 OpenRouter API Key。`;
     }
   },
 
