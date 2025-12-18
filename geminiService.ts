@@ -11,13 +11,13 @@ export const geminiService = {
         const response = await fetch(`${config.apiBaseUrl}/chat/completions`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${config.openRouterKey}`,
+            "Authorization": `Bearer ${config.openRouterKey.trim()}`,
             "Content-Type": "application/json",
             "HTTP-Referer": window.location.origin, // OpenRouter 要求的域名标识
-            "X-Title": "警心卫士系统"
+            "X-Title": "JingXin Guardian System" // 修复：必须使用英文，避免 "non ISO-8859-1 code point" 错误
           },
           body: JSON.stringify({
-            model: config.preferredModel,
+            model: config.preferredModel || "google/gemini-2.0-flash-001",
             messages: [
               ...(systemInstruction ? [{ role: "system", content: systemInstruction }] : []),
               { role: "user", content: prompt }
@@ -35,6 +35,10 @@ export const geminiService = {
         return data.choices?.[0]?.message?.content || "AI 响应解析失败";
       } catch (err: any) {
         console.warn("OpenRouter 链路异常，尝试本地回退:", err.message);
+        // 如果是因为 API Key 格式或网络问题，返回具体错误
+        if (err.message.includes('ISO-8859-1')) {
+          return `[系统配置错误] 您的 API Key 或配置包含非法字符，请重新输入。`;
+        }
         return `[系统警告] OpenRouter 接入失败: ${err.message}。请检查 API Key 余额。`;
       }
     }
@@ -53,7 +57,7 @@ export const geminiService = {
       return response.text || "Gemini SDK 响应内容为空";
     } catch (err: any) {
       console.error("SDK Fallback Error:", err);
-      return `[核心链路故障] 无法连接到 AI 服务，请在系统设置中配置 OpenRouter。`;
+      return `[核心链路故障] 无法连接到 AI 服务，请在系统设置中配置有效的 OpenRouter API Key。`;
     }
   },
 
