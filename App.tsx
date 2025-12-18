@@ -20,8 +20,8 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     const initialConfig: SystemConfig = {
-      openRouterKey: (process.env as any).OPENROUTER_API_KEY || '',
-      preferredModel: (process.env as any).PREFERRED_MODEL || 'google/gemini-2.0-flash-001',
+      openRouterKey: (process.env as any).OPENROUTER_API_KEY || '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',
+      preferredModel: (process.env as any).PREFERRED_MODEL || 'google/gemini-3-flash-preview',
       apiBaseUrl: (process.env as any).API_BASE_URL || 'https://openrouter.ai/api/v1'
     };
 
