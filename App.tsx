@@ -22,7 +22,7 @@ const STORAGE_KEY = 'jingxin_guardian_data_v8';
  * 这样系统会自动回退到使用 Vercel 环境变量中配置的 process.env.API_KEY (Native Gemini)
  */
 const SYSTEM_FACTORY_CONFIG: SystemConfig = {
-  openRouterKey: '', // 留空以触发 Native Gemini 回退
+  openRouterKey: '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', // 留空以触发 Native Gemini 回退
   preferredModel: 'gemini-3-flash-preview',
   apiBaseUrl: 'https://openrouter.ai/api/v1'
 };
