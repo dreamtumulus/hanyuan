@@ -40,17 +40,16 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
     setIsTyping(true);
 
     try {
-      // 传递完整的对话历史给 AI
       const response = await geminiService.getPsychTestResponse(newMsgs, officerInfo, round + 1, systemConfig);
       setMessages([...newMsgs, { role: 'model', text: response }]);
       
-      if (round >= 10 || response.includes("报告") || response.includes("评估")) {
+      if (round >= 10) {
         setIsFinished(true);
         const finalReport: PsychTestReport = {
           id: Date.now().toString(),
           date: new Date().toLocaleDateString(),
-          score: 85,
-          level: '评估完成',
+          score: 88,
+          level: '优良',
           content: response,
           messages: [...newMsgs, { role: 'model', text: response }]
         };
@@ -58,9 +57,8 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
       } else {
         setRound(prev => prev + 1);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setMessages([...newMsgs, { role: 'model', text: `[系统异常] 消息发送失败，请检查网络或配置。详情: ${err.message}` }]);
     } finally {
       setIsTyping(false);
     }
@@ -80,7 +78,7 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
         </div>
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] text-slate-500 font-bold">测评进度 {Math.min(round, 10)}/10</span>
+            <span className="text-[10px] text-slate-500 font-bold">测评轮次 {Math.min(round, 10)}/10</span>
             <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1 border">
               <div 
                 className="h-full bg-blue-700 transition-all duration-500" 
@@ -104,8 +102,8 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center space-y-4 py-20">
             <div className="text-6xl opacity-10">🛡️</div>
-            <p className="max-w-xs text-sm">系统将通过 10 轮深度对话，从职业压力、家庭支持等维度生成心理分析。</p>
-            <button onClick={startNewTest} className="mt-4 px-8 py-3 bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">立即开始</button>
+            <p className="max-w-xs text-sm">系统将通过 10 轮深度对话，从职业压力、家庭支持等 5 个维度生成心理底色分析。</p>
+            <button onClick={startNewTest} className="mt-4 px-8 py-3 bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-transform">开始新测评</button>
           </div>
         ) : (
           messages.map((m, i) => (
@@ -132,7 +130,7 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
         {isFinished && (
           <div className="bg-blue-50 border border-blue-200 p-6 rounded-xl text-center space-y-3 animate-fadeIn">
             <h4 className="font-bold text-blue-900">心理研判底稿已生成</h4>
-            <p className="text-sm text-blue-700">本次对话已结束，研判结论已记录。您可以点击“重启对话”再次开始。</p>
+            <p className="text-sm text-blue-700">本次测评结果已存入个人档案，将作为思想动态研判的重要权项。</p>
           </div>
         )}
       </div>
@@ -145,7 +143,7 @@ const PsychTestPage: React.FC<PsychTestPageProps> = ({ reports, onAddReport, off
             onChange={e => setInputValue(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
             disabled={isFinished || messages.length === 0}
-            placeholder={messages.length === 0 ? "点击按钮开始..." : (isFinished ? "对话已结束" : "输入消息...")}
+            placeholder={messages.length === 0 ? "点击开始开始..." : (isFinished ? "对话已结束" : "输入战友的心声...")}
             className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-700 focus:bg-white transition-all text-sm"
           />
           <button 

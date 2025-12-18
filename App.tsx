@@ -14,25 +14,23 @@ import DashboardPage from './pages/DashboardPage';
 import AnalysisReportPage from './pages/AnalysisReportPage';
 import AdminSettings from './pages/AdminSettings';
 
-const STORAGE_KEY = 'jingxin_guardian_data_v13';
-
-const SYSTEM_FACTORY_CONFIG: SystemConfig = {
-  preferredModel: 'gemini-3-flash-preview',
-};
+const STORAGE_KEY = 'jingxin_guardian_data_v6';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    const initialConfig = { ...SYSTEM_FACTORY_CONFIG };
+    const initialConfig: SystemConfig = {
+      openRouterKey: (process.env as any).OPENROUTER_API_KEY || '',
+      preferredModel: (process.env as any).PREFERRED_MODEL || 'google/gemini-2.0-flash-001',
+      apiBaseUrl: (process.env as any).API_BASE_URL || 'https://openrouter.ai/api/v1'
+    };
 
     if (saved) {
       const parsed = JSON.parse(saved);
-      const mergedConfig: SystemConfig = {
-        preferredModel: parsed.systemConfig?.preferredModel || initialConfig.preferredModel,
-      };
-      return { ...parsed, systemConfig: mergedConfig };
+      return { ...parsed, systemConfig: { ...initialConfig, ...parsed.systemConfig } };
     }
 
+    // 默认初始账号
     const defaultAccounts: Record<string, UserAccount> = {
       'admin': { username: 'admin', password: 'xiaoyuan', role: UserRole.ADMIN, name: '管理员' },
       'xiaoyuantest': { username: 'xiaoyuantest', password: '123456', role: 'MULTIPLE', name: '演示账号' },
@@ -113,21 +111,47 @@ const App: React.FC = () => {
     setState(prev => {
       const updatedPersonalInfo = { ...prev.personalInfo };
       const updatedAccounts = { ...prev.accounts };
+      
+      // 如果该人员不在库中，自动新建基础档案和账号
       if (!updatedPersonalInfo[record.policeId]) {
         updatedPersonalInfo[record.policeId] = {
-          name: record.officerName, policeId: record.policeId, department: '基层科所队',
-          position: '待定', gender: '男', age: '', idCard: '', hometown: '', address: '', phone: '', email: '', family: []
+          name: record.officerName,
+          policeId: record.policeId,
+          department: '基层科所队',
+          position: '待定',
+          gender: '男',
+          age: '',
+          idCard: '',
+          hometown: '',
+          address: '',
+          phone: '',
+          email: '',
+          family: []
         };
+        
+        // 自动创建民警账号，默认密码为 123456 或队长指定的密码
         updatedAccounts[record.policeId] = {
-          username: record.policeId, password: password || '123456', role: UserRole.OFFICER, name: record.officerName
+          username: record.policeId,
+          password: password || '123456',
+          role: UserRole.OFFICER,
+          name: record.officerName
         };
       }
-      return { ...prev, personalInfo: updatedPersonalInfo, accounts: updatedAccounts, talkRecords: [record, ...prev.talkRecords] };
+      
+      return {
+        ...prev,
+        personalInfo: updatedPersonalInfo,
+        accounts: updatedAccounts,
+        talkRecords: [record, ...prev.talkRecords]
+      };
     });
   };
 
   const saveAnalysisReport = (report: AIAnalysisReport) => {
-    setState(prev => ({ ...prev, analysisReports: { ...prev.analysisReports, [report.policeId]: report } }));
+    setState(prev => ({
+      ...prev,
+      analysisReports: { ...prev.analysisReports, [report.policeId]: report }
+    }));
   };
 
   const logout = () => {
@@ -140,6 +164,8 @@ const App: React.FC = () => {
     if (currentPath === 'identity-select') return <IdentitySelect onSelect={setRole} />;
     if (currentPath === 'admin-settings') return <AdminSettings config={state.systemConfig} onSave={(c) => setState(prev => ({...prev, systemConfig: c}))} />;
 
+    // 确定当前上下文 ID
+    // 如果是民警登录，只能看自己的 actualId；如果是领导/队长，可以切换 activeOfficerId
     const effectiveId = (state.currentUser.role === UserRole.OFFICER) ? (state.currentUser.actualId || 'TEST001') : activeOfficerId;
 
     switch (currentPath) {
@@ -167,7 +193,12 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       {state.currentUser && currentPath !== 'login' && (
-        <Header user={state.currentUser} onBack={() => window.history.back()} onLogout={logout} showBack={currentPath !== 'identity-select'} />
+        <Header 
+          user={state.currentUser} 
+          onBack={() => window.history.back()} 
+          onLogout={logout} 
+          showBack={currentPath !== 'identity-select'}
+        />
       )}
       <div className="flex flex-1 overflow-hidden relative">
         {showSidebar && <Sidebar role={state.currentUser.role} currentPath={currentPath} onNavigate={navigate} />}

@@ -14,7 +14,9 @@ export interface UserAccount {
 }
 
 export interface SystemConfig {
+  openRouterKey: string;
   preferredModel: string;
+  apiBaseUrl: string;
 }
 
 export interface FamilyMember {
