@@ -16,18 +16,33 @@ import AdminSettings from './pages/AdminSettings';
 
 const STORAGE_KEY = 'jingxin_guardian_data_v6';
 
+// 系统预设默认配置
+const SYSTEM_DEFAULT_CONFIG: SystemConfig = {
+  openRouterKey: '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',
+  preferredModel: 'google/gemini-3-flash-preview',
+  apiBaseUrl: 'https://openrouter.ai/api/v1'
+};
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    const initialConfig: SystemConfig = {
-      openRouterKey: (process.env as any).OPENROUTER_API_KEY || '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',
-      preferredModel: (process.env as any).PREFERRED_MODEL || 'oogle/gemini-3-flash-preview',
-      apiBaseUrl: (process.env as any).API_BASE_URL || 'https://openrouter.ai/api/v1'
+    
+    // 基础配置优先顺序：环境变量 > 代码内置默认
+    const baseConfig: SystemConfig = {
+      openRouterKey: (process.env as any).OPENROUTER_API_KEY || SYSTEM_DEFAULT_CONFIG.openRouterKey,
+      preferredModel: (process.env as any).PREFERRED_MODEL || SYSTEM_DEFAULT_CONFIG.preferredModel,
+      apiBaseUrl: (process.env as any).API_BASE_URL || SYSTEM_DEFAULT_CONFIG.apiBaseUrl
     };
 
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...parsed, systemConfig: { ...initialConfig, ...parsed.systemConfig } };
+      // 合并逻辑：如果用户保存的 Key 为空字符串，则回退到 baseConfig 的默认值
+      const mergedConfig: SystemConfig = {
+        openRouterKey: parsed.systemConfig?.openRouterKey || baseConfig.openRouterKey,
+        preferredModel: parsed.systemConfig?.preferredModel || baseConfig.preferredModel,
+        apiBaseUrl: parsed.systemConfig?.apiBaseUrl || baseConfig.apiBaseUrl,
+      };
+      return { ...parsed, systemConfig: mergedConfig };
     }
 
     // 默认初始账号
@@ -51,7 +66,7 @@ const App: React.FC = () => {
       psychTestReports: {},
       talkRecords: [],
       analysisReports: {},
-      systemConfig: initialConfig
+      systemConfig: baseConfig
     };
   });
 
@@ -112,7 +127,6 @@ const App: React.FC = () => {
       const updatedPersonalInfo = { ...prev.personalInfo };
       const updatedAccounts = { ...prev.accounts };
       
-      // 如果该人员不在库中，自动新建基础档案和账号
       if (!updatedPersonalInfo[record.policeId]) {
         updatedPersonalInfo[record.policeId] = {
           name: record.officerName,
@@ -129,7 +143,6 @@ const App: React.FC = () => {
           family: []
         };
         
-        // 自动创建民警账号，默认密码为 123456 或队长指定的密码
         updatedAccounts[record.policeId] = {
           username: record.policeId,
           password: password || '123456',
@@ -164,8 +177,6 @@ const App: React.FC = () => {
     if (currentPath === 'identity-select') return <IdentitySelect onSelect={setRole} />;
     if (currentPath === 'admin-settings') return <AdminSettings config={state.systemConfig} onSave={(c) => setState(prev => ({...prev, systemConfig: c}))} />;
 
-    // 确定当前上下文 ID
-    // 如果是民警登录，只能看自己的 actualId；如果是领导/队长，可以切换 activeOfficerId
     const effectiveId = (state.currentUser.role === UserRole.OFFICER) ? (state.currentUser.actualId || 'TEST001') : activeOfficerId;
 
     switch (currentPath) {
